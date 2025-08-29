@@ -1,0 +1,190 @@
+{
+  "members": [
+    {
+      "name": "Alice Johnson",
+      "selfie": "assets/selfies/alice.png",
+      "joinDate": "2020",
+      "referrals": ["Bob Smith", "Charlie Brown", "Grace Lee"]
+    },
+    {
+      "name": "Bob Smith",
+      "selfie": "assets/selfies/bob.png",
+      "joinDate": "2021",
+      "referrals": ["David Wilson", "Emma Garcia"]
+    },
+    {
+      "name": "Charlie Brown",
+      "selfie": "assets/selfies/charlie.png",
+      "joinDate": "2021",
+      "referrals": ["Frank Miller", "Isabella Rodriguez"]
+    },
+    {
+      "name": "David Wilson",
+      "selfie": "assets/selfies/david.png",
+      "joinDate": "2022",
+      "referrals": ["James Taylor", "Kate Anderson"]
+    },
+    {
+      "name": "Emma Garcia",
+      "selfie": "assets/selfies/emma.png",
+      "joinDate": "2022",
+      "referrals": ["Luke Thompson", "Maya Patel"]
+    },
+    {
+      "name": "Frank Miller",
+      "selfie": "assets/selfies/frank.png",
+      "joinDate": "2022",
+      "referrals": ["Noah White"]
+    },
+    {
+      "name": "Grace Lee",
+      "selfie": "assets/selfies/grace.png",
+      "joinDate": "2021",
+      "referrals": ["Henry Kim", "Peter Clark"]
+    },
+    {
+      "name": "Henry Kim",
+      "selfie": "assets/selfies/henry.png",
+      "joinDate": "2022",
+      "referrals": ["Quinn Lewis", "Rachel Turner"]
+    },
+    {
+      "name": "Isabella Rodriguez",
+      "selfie": "assets/selfies/isabella.png",
+      "joinDate": "2022",
+      "referrals": ["Sam Walker"]
+    },
+    {
+      "name": "James Taylor",
+      "selfie": "assets/selfies/james.png",
+      "joinDate": "2023",
+      "referrals": ["Tom Wilson", "Uma Singh"]
+    },
+    {
+      "name": "Kate Anderson",
+      "selfie": "assets/selfies/kate.png",
+      "joinDate": "2023",
+      "referrals": ["Victor Chen"]
+    },
+    {
+      "name": "Luke Thompson",
+      "selfie": "assets/selfies/luke.png",
+      "joinDate": "2023",
+      "referrals": ["Wendy Davis", "Xander Moore"]
+    },
+    {
+      "name": "Maya Patel",
+      "selfie": "assets/selfies/maya.png",
+      "joinDate": "2023",
+      "referrals": ["Yara Ahmed"]
+    },
+    {
+      "name": "Noah White",
+      "selfie": "assets/selfies/noah.png",
+      "joinDate": "2023",
+      "referrals": ["Zoe Martin"]
+    },
+    {
+      "name": "Peter Clark",
+      "selfie": "assets/selfies/peter.png",
+      "joinDate": "2022",
+      "referrals": ["Aaron Brooks", "Bella Cooper"]
+    },
+    {
+      "name": "Quinn Lewis",
+      "selfie": "assets/selfies/quinn.png",
+      "joinDate": "2023",
+      "referrals": ["Carl Reed"]
+    },
+    {
+      "name": "Rachel Turner",
+      "selfie": "assets/selfies/rachel.png",
+      "joinDate": "2023",
+      "referrals": ["Diana Foster"]
+    },
+    {
+      "name": "Sam Walker",
+      "selfie": "assets/selfies/sam.png",
+      "joinDate": "2023",
+      "referrals": ["Eric Stone", "Fiona Bell"]
+    },
+    {
+      "name": "Tom Wilson",
+      "selfie": "assets/selfies/tom.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Uma Singh",
+      "selfie": "assets/selfies/uma.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Victor Chen",
+      "selfie": "assets/selfies/victor.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Wendy Davis",
+      "selfie": "assets/selfies/wendy.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Xander Moore",
+      "selfie": "assets/selfies/xander.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Yara Ahmed",
+      "selfie": "assets/selfies/yara.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Zoe Martin",
+      "selfie": "assets/selfies/zoe.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Aaron Brooks",
+      "selfie": "assets/selfies/aaron.png",
+      "joinDate": "2023",
+      "referrals": []
+    },
+    {
+      "name": "Bella Cooper",
+      "selfie": "assets/selfies/bella.png",
+      "joinDate": "2023",
+      "referrals": []
+    },
+    {
+      "name": "Carl Reed",
+      "selfie": "assets/selfies/carl.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Diana Foster",
+      "selfie": "assets/selfies/diana.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Eric Stone",
+      "selfie": "assets/selfies/eric.png",
+      "joinDate": "2024",
+      "referrals": []
+    },
+    {
+      "name": "Fiona Bell",
+      "selfie": "assets/selfies/fiona.png",
+      "joinDate": "2024",
+      "referrals": []
+    }
+  ]
+}
