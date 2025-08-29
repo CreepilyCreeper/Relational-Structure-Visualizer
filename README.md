@@ -8,7 +8,7 @@ The Community Visualizer is a 3D interactive tool designed to represent members 
 - **Interactive Nodes**: Clickable nodes that display additional information about each member.
 - **Dynamic Data Loading**: Fetch community data from a JSON file to populate the visualizer.
 
-## Project Structure
+## Project Structure 
 ```
 community-visualizer
 ├── src
