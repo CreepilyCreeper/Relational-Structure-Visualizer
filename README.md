@@ -53,9 +53,3 @@ community-visualizer
 
 ## Usage
 Open `src/index.html` in your web browser to view the visualizer. Interact with the nodes to explore the community structure.
-
-## Contributing
-Contributions are welcome! Please submit a pull request or open an issue for any suggestions or improvements.
-
-## License
-This project is licensed under the MIT License.
