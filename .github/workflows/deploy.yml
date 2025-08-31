@@ -1,4 +1,8 @@
 # This is an example of a GitHub Actions workflow file for deploying to GitHub Pages.
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 name: Deploy to GitHub Pages
 
