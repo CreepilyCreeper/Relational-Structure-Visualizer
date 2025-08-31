@@ -11,12 +11,15 @@ class Visualizer {
         this.connections = [];
         this.isAnimating = false;
         this.config = {
-            nodeSize: 0.5,
+            nodeSize: 0.1,
             layerTension: 1.0,        // Attraction between layers
             nodeRepulsion: 2.0,       // Repulsion within same layer
             verticalSpacing: 3.0,
             animationDelay: 100,
-            glowEffect: false
+            optimizationSteps: 100,
+            stepSize: 0.1,
+            convergenceThreshold: 0.001,
+            glowEffect: false        // Solid nodes, no glow
         };
     }
 
@@ -44,11 +47,165 @@ class Visualizer {
         // Build tree structure and organize by layers
         const layers = this.organizeByLayers(data, nodeMap);
         
-        // Position nodes using physics-based approach
-        this.positionNodesWithPhysics(layers);
+        // Initialize positions
+        this.initializePositions(layers);
+        
+        // Optimize positions using hill climbing
+        console.log('Starting hill climbing optimization...');
+        await this.hillClimbingOptimization(layers, data);
+        console.log('Optimization complete!');
         
         // Create and add meshes with animation and connections
         await this.createNodesSequentially(allYears, layers, data, nodeMap);
+    }
+
+    initializePositions(layers) {
+        layers.forEach((layer, layerIndex) => {
+            const y = -layerIndex * this.config.verticalSpacing;
+            
+            layer.forEach((node, nodeIndex) => {
+                // Initial circular positioning with randomness
+                const angle = (nodeIndex / layer.length) * Math.PI * 2;
+                const radius = Math.sqrt(layer.length) * 2;
+                
+                node.position.set(
+                    Math.cos(angle) * radius + (Math.random() - 0.5) * 2,
+                    y,
+                    Math.sin(angle) * radius + (Math.random() - 0.5) * 2
+                );
+            });
+        });
+    }
+
+    async hillClimbingOptimization(layers, data) {
+        let currentEnergy = this.calculateTotalEnergy(layers, data);
+        let bestEnergy = currentEnergy;
+        let noImprovementCount = 0;
+        
+        for (let step = 0; step < this.config.optimizationSteps; step++) {
+            // Try small random moves for each node
+            const improvements = [];
+            
+            for (const layer of layers) {
+                for (const node of layer) {
+                    const originalPos = node.position.clone();
+                    const bestMove = this.findBestMove(node, layers, data);
+                    
+                    if (bestMove.energyImprovement > this.config.convergenceThreshold) {
+                        improvements.push({
+                            node: node,
+                            newPosition: bestMove.position,
+                            improvement: bestMove.energyImprovement
+                        });
+                    }
+                }
+            }
+            
+            // Apply the best improvements
+            if (improvements.length > 0) {
+                // Sort by improvement and apply the best ones
+                improvements.sort((a, b) => b.improvement - a.improvement);
+                
+                let totalImprovement = 0;
+                for (const improvement of improvements.slice(0, Math.max(1, improvements.length / 4))) {
+                    improvement.node.position.copy(improvement.newPosition);
+                    totalImprovement += improvement.improvement;
+                }
+                
+                currentEnergy = this.calculateTotalEnergy(layers, data);
+                
+                if (currentEnergy < bestEnergy) {
+                    bestEnergy = currentEnergy;
+                    noImprovementCount = 0;
+                } else {
+                    noImprovementCount++;
+                }
+                
+                // Add small delay to show progress (optional)
+                if (step % 10 === 0) {
+                    await this.delay(1);
+                    console.log(`Optimization step ${step}, energy: ${currentEnergy}`);
+                }
+                
+                // Stop if no improvement for several steps
+                if (noImprovementCount > 10) {
+                    break;
+                }
+            }
+        }
+    }
+
+    findBestMove(node, layers, data) {
+        const bestMove = {
+            position: node.position.clone(),
+            energyImprovement: 0
+        };
+        
+        const originalEnergy = this.calculateTotalEnergy(layers, data);
+        
+        // Try small random moves
+        for (let i = 0; i < 10; i++) {
+            const move = new THREE.Vector3(
+                (Math.random() - 0.5) * this.config.stepSize,
+                0,
+                (Math.random() - 0.5) * this.config.stepSize
+            );
+            
+            const newPosition = node.position.clone().add(move);
+            node.position.copy(newPosition);
+            
+            const newEnergy = this.calculateTotalEnergy(layers, data);
+            const energyImprovement = originalEnergy - newEnergy;
+            
+            if (energyImprovement > bestMove.energyImprovement) {
+                bestMove.position.copy(newPosition);
+                bestMove.energyImprovement = energyImprovement;
+            }
+            
+            // Revert to original position
+            node.position.copy(bestMove.position);
+        }
+        
+        return bestMove;
+    }
+
+    calculateTotalEnergy(layers, data) {
+        let totalEnergy = 0;
+        
+        // Calculate energy based on layer tension and same layer repulsion
+        for (let layerIndex = 0; layerIndex < layers.length - 1; layerIndex++) {
+            const currentLayer = layers[layerIndex];
+            const nextLayer = layers[layerIndex + 1];
+            
+            currentLayer.forEach(parentNode => {
+                const person = data.find(p => p.name === parentNode.data.name);
+                if (person && person.referrals) {
+                    person.referrals.forEach(referralName => {
+                        const childNode = nextLayer.find(n => n.data.name === referralName);
+                        if (childNode) {
+                            const distance = parentNode.position.distanceTo(childNode.position);
+                            totalEnergy += this.config.layerTension * distance;
+                        }
+                    });
+                }
+            });
+        }
+        
+        layers.forEach(layer => {
+            for (let i = 0; i < layer.length; i++) {
+                for (let j = i + 1; j < layer.length; j++) {
+                    const nodeA = layer[i];
+                    const nodeB = layer[j];
+                    
+                    const distance = nodeA.position.distanceTo(nodeB.position);
+                    if (distance > 0) {
+                        totalEnergy += this.config.nodeRepulsion / (distance * distance);
+                    }
+                }
+            }
+        });
+        
+        return totalEnergy;
     }
 
     organizeByLayers(data, nodeMap) {

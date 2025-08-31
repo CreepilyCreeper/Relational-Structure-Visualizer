@@ -7,9 +7,10 @@ class Node {
         this.position = new THREE.Vector3();
         this.textureLoader = new THREE.TextureLoader();
         this.config = {
-            nodeSize: 0.5,
-            glowEffect: false,
-            ...config
+            ...config,
+            nodeSize: config.nodeSize || 0.1,  // Use config value or default
+            glowEffect: config.glowEffect || false
+    
         };
         this.originalScale = this.config.nodeSize;
         this.imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'tiff'];
@@ -18,6 +19,7 @@ class Node {
     async createNode(allYears = null) {
         console.log(`Creating node for ${this.data.name}, selfie path: ${this.data.selfie}`);
         
+        //const geometry = new THREE.SphereGeometry(this.originalScale, 32, 32);
         const geometry = new THREE.SphereGeometry(this.originalScale, 32, 32);
         const color = new THREE.Color(this.getPersonColor(allYears));
         

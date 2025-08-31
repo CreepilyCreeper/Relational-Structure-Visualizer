@@ -103,12 +103,15 @@ const visualizer = new Visualizer(scene, camera, renderer, composer);
 
 // Configure the visualizer
 visualizer.updateConfig({
-    nodeSize: 1.3,           // Reasonable node size
+    nodeSize: 0.5,           // Reasonable node size
     layerTension: 0.2,       // Attraction between parent-child nodes
     nodeRepulsion: 3.0,      // Repulsion between nodes in same layer
     verticalSpacing: 4.0,    // Vertical space between layers
     animationDelay: 50,     // Delay between individual node appearances (ms)
-    glowEffect: false        // Solid nodes, no glow
+    glowEffect: false,        // Solid nodes, no glow
+    optimizationSteps: 100,
+    stepSize: 0.1,
+    convergenceThreshold: 0.001
 });
 
 // Load and render community data
