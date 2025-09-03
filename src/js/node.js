@@ -7,10 +7,9 @@ class Node {
         this.position = new THREE.Vector3();
         this.textureLoader = new THREE.TextureLoader();
         this.config = {
-            ...config,
-            nodeSize: config.nodeSize || 0.1,  // Use config value or default
-            glowEffect: config.glowEffect || false
-    
+            nodeSize: 0.1,  // Use config value or default
+            glowEffect: false,
+            ...config
         };
         this.originalScale = this.config.nodeSize;
         this.imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'tiff'];
@@ -19,9 +18,9 @@ class Node {
     async createNode(allYears = null) {
         console.log(`Creating node for ${this.data.name}, selfie path: ${this.data.selfie}`);
         
-        //const geometry = new THREE.SphereGeometry(this.originalScale, 32, 32);
         const geometry = new THREE.SphereGeometry(this.originalScale, 32, 32);
-        const color = new THREE.Color(this.getPersonColor(allYears));
+        //const color = new THREE.Color(this.getPersonColor(allYears));
+        const color = new THREE.Color(this.config.nodeColor);
         
         // Create solid material (no transparency or glow)
         const material = new THREE.MeshBasicMaterial({
@@ -87,7 +86,7 @@ class Node {
         });
     }
 
-    getPersonColor(allYears = null) {
+    /*getPersonColor(allYears = null) {
         // If no years provided, use a default range
         if (!allYears || allYears.length === 0) {
             return 0xff00ff; // Default magenta
@@ -107,7 +106,7 @@ class Node {
         const b = 255;
         
         return (r << 16) | (g << 8) | b;
-    }
+    }*/
 
     update(newData) {
         this.data = newData;

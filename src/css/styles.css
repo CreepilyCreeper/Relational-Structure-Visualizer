@@ -48,3 +48,80 @@ body {
 .tooltip.active {
     display: block;
 }
+
+:root {
+    --side-menu-width: 300px; /* You can change this value */
+}
+
+@media (max-width: 750px) {
+    :root {
+        --side-menu-width: 40vw;
+    }
+    .image-section {
+        height: 40vw;
+        min-height: 180px; /* Optional: set a minimum height */
+    }
+}
+
+#side-menu {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: var(--side-menu-width);
+    height: 100%;
+    background: #696969;
+    box-shadow: 0 0 10px rgba(0,0,0,0.08);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-section {
+    padding: 20px 20px;
+    box-sizing: border-box;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: #555555;
+    margin: 0 16px;
+}
+
+.image-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: var(--side-menu-width); /* same as sidebar width */
+    justify-content: flex-start;
+    padding-bottom: 0;
+}
+
+.node-name {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 12px;
+    font-size: 1.2em;
+}
+
+.node-image-wrapper {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #f5f5f500; /* Default background */
+}
+
+#node-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    aspect-ratio: 1/1; /* keeps image square, adjust if needed */
+    background: transparent; /* Ensure the image itself doesn't override the wrapper's background */
+}
+
+#node-image:empty {
+    background: #f5f5f5; /* Fallback background when the image is missing */
+}
