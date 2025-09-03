@@ -187,27 +187,6 @@ renderer.domElement.addEventListener('click', (event) => {
     }
 });
 
-// Utility function to format node data as HTML
-function formatNodeDetails(node) {
-    let html = '<ul>';
-    for (const key in node) {
-        if (!Object.prototype.hasOwnProperty.call(node, key)) continue;
-        if (key === 'mesh' || key === 'nodeInstance') continue; // skip circular refs
-
-        if (key === 'selfie' && node[key]) {
-            html += `<a href="${node[key]}" target="_blank" style="display:flex;justify-content:center;"><img src="${node[key]}" alt="selfie" style="max-width:60px;vertical-align:middle"></a>`;
-        } else if (Array.isArray(node[key])) {
-            html += `<li><strong>${key}:</strong> [${node[key].join(', ')}]</li>`;
-        } else if (typeof node[key] === 'object' && node[key] !== null) {
-            html += `<li><strong>${key}:</strong> [object]</li>`;
-        } else {
-            html += `<li><strong>${key}:</strong> ${node[key]}</li>`;
-        }
-    }
-    html += '</ul>';
-    return html;
-}
-
 renderer.domElement.addEventListener('wheel', (event) => {
     cameraRadius = Math.max(5, Math.min(70, cameraRadius + event.deltaY * 0.05));
     updateCameraPosition();

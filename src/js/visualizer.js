@@ -146,23 +146,33 @@ class Visualizer {
                     // If parent found and placed, position under parent; else, use layer Y
                     let x = (Math.random() - 0.5) * 2;
                     let z = (Math.random() - 0.5) * 2;
-                    let y;
+                    const layerIndex = this.layersForPlacement.findIndex(layer => layer.includes(nodeToPlace));
+                    let y = -layerIndex * this.config.verticalSpacing;
+                    let parentY = y;
                     if (parentNode && parentNode.isPlaced) {
                         x += parentNode.position.x;
                         z += parentNode.position.z;
-                        const layerIndex = this.layersForPlacement.findIndex(layer => layer.includes(nodeToPlace));
-                        y = -layerIndex * this.config.verticalSpacing;
-                    } else {
-                        // fallback: use layer Y
-                        const layerIndex = this.layersForPlacement.findIndex(layer => layer.includes(nodeToPlace));
-                        y = -layerIndex * this.config.verticalSpacing;
+                        parentY = parentNode.position.y;
                     }
-                    nodeToPlace.position.set(x, y, z);
+                    nodeToPlace.position.set(x, parentY, z); // Start at parent's Y
+                    nodeToPlace.targetY = y; // Glide to this Y
+                    nodeToPlace.glideProgress = 0; // 0 to 1 over 20 frames
                     nodeToPlace.isPlaced = true;
                     this.placedNodeCount++;
                     if (nodeToPlace.mesh) nodeToPlace.mesh.visible = true;
                 }
             }
+
+            // --- Y GLIDE LOGIC ---
+            this.nodes.forEach(node => {
+                if (node.isPlaced && typeof node.targetY === "number" && node.glideProgress < 1) {
+                    node.glideProgress += 1 / 20; // 20 iterations
+                    if (node.glideProgress > 1) node.glideProgress = 1;
+                    // Linear interpolation from current y to targetY
+                    node.position.y = node.position.y * (1 - node.glideProgress) + node.targetY * node.glideProgress;
+                    if (node.mesh) node.mesh.position.y = node.position.y;
+                }
+            });
 
             // Reset forces
             this.nodes.forEach(node => {
@@ -196,7 +206,9 @@ class Visualizer {
                 node.position.x = newPos.x;
                 node.position.z = newPos.z;
                 if (node.mesh) {
-                    node.mesh.position.copy(node.position);
+                    node.mesh.position.x = node.position.x;
+                    node.mesh.position.z = node.position.z;
+                    // node.mesh.position.y is handled by glide logic above
                     node.mesh.visible = true;
                 }
             });
