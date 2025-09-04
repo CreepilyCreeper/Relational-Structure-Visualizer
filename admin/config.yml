@@ -1,0 +1,24 @@
+backend:
+  name: git-gateway
+  repo: CreepilyCreeper/Relational-Structure-Visualizer
+  branch: main
+
+media_folder: "static/images/uploads"
+public_folder: "/images/uploads"
+
+collections:
+  - name: "members"
+    label: "Members"
+    label_singular: "Member"
+    description: "Manage community members"
+    files:
+      - file: "data/members.json"
+        label: "Members List"
+        name: "members"
+        format: "json"
+        fields:
+          - { label: "Members", name: "members", widget: "list", fields: [
+              { label: "Name", name: "name", widget: "string" },
+              { label: "Testimonial", name: "testimonial", widget: "text" },
+              { label: "Image", name: "image", widget: "image" }
+            ] }
