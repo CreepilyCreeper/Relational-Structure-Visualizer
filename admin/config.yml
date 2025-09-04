@@ -2,9 +2,9 @@ backend:
   name: github
   repo: CreepilyCreeper/Relational-Structure-Visualizer
   branch: main
+  app_id: Ov23li7JKJ2CH4t9foEA
+  base_url: https://auth.decapcms.org
   auth_scope: repo
-  client_id: Ov23li7JKJ2CH4t9foEA
-  client_secret: ab41fc350001477d7732ab23eacb46728c8e2717
 
 media_folder: "static/images/uploads"
 public_folder: "/images/uploads"
