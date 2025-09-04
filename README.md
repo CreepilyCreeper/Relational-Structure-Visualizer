@@ -1,4 +1,4 @@
-# Relational-Structure-Visualizer
+# Relational-Structure-Visualizer 
 
 ## Overview
 Relational-Structure-Visualizer is a 3D interactive tool designed to represent members of a community as nodes in a tree structure. Each node corresponds to a person in the community, displaying their selfie and information about their joining date and connections to other members.
