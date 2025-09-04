@@ -148,7 +148,7 @@ renderer.domElement.addEventListener('mousemove', (event) => {
         const deltaX = event.clientX - mouseX;
         const deltaY = event.clientY - mouseY;
         cameraTheta += deltaX * 0.01;
-        cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi + deltaY * 0.01));
+        cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi - deltaY * 0.01)); // Invert up/down
         updateCameraPosition();
         mouseX = event.clientX;
         mouseY = event.clientY;
@@ -405,7 +405,7 @@ function showSearchResults(results) {
 function selectNodeFromSearch(member) {
     // Find the mesh for this member
     const nodeMeshes = visualizer.getNodeMeshes();
-    const mesh = nodeMeshes.find(m => m.userData.nodeData && m.userData.nodeData.id === member.id);
+    const mesh = nodeMeshes.find(m => m.userData.nodeData && m.userData.nodeData.name === member.name);
     if (mesh) {
         selectedNode = mesh.userData.nodeData;
         cameraConfig.center = selectedNode.position;
