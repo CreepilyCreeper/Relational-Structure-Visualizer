@@ -1,11 +1,13 @@
-# filepath: community-visualizer/cms/config.yml
+# filepath: community-visualizer/admin/config.yml
 # yaml-language-server: $schema=https://unpkg.com/@sveltia/cms/schema/sveltia-cms.json
 
 backend:
   name: github
   repo: CreepilyCreeper/Relational-Structure-Visualizer
   branch: main
-  app_id: Ov23li7EPwaGjZQo3FCH
+  app_id: Ov23li7EPwaGjZQo3FCH # Your GitHub OAuth App Client ID
+  base_url: https://github.com/login/oauth # GitHub OAuth base URL
+  auth_endpoint: authorize # GitHub OAuth authorize endpoint
   auth_scope: repo
 
 media_folder: "static/images/uploads"
