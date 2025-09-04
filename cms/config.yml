@@ -1,3 +1,4 @@
+# filepath: community-visualizer/cms/config.yml
 backend:
   name: github
   repo: CreepilyCreeper/Relational-Structure-Visualizer
