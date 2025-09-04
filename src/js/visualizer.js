@@ -375,6 +375,8 @@ class Visualizer {
             if (parentNode.isPlaced && childNode.isPlaced) {
                 const positions = [parentNode.position, childNode.position];
                 line.geometry.setFromPoints(positions);
+                line.geometry.computeBoundingSphere(); // <-- Add this
+                line.geometry.computeBoundingBox();    // <-- Add this
                 line.visible = true;
             } else {
                 line.visible = false;
@@ -470,7 +472,6 @@ class Visualizer {
         while (true) {
             // Find parent(s) of the current node
             const parents = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(currentNode.name));
-            console.log('Parents of', currentNode.name, parents.map(p => p.data.name));
             if (parents.length === 0) break; // No more parents, stop
             // For each parent, highlight the link from its parent to it
             parents.forEach(parent => {

@@ -2,13 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Community Visualizer</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div id="visualizer-container"></div>
     <div id="side-menu" style="display:none;">
+        <div class="sidebar-section search-section">
+            <input type="text" id="sidebar-search" placeholder="Search by name or join date..." autocomplete="off">
+        </div>
+        <div class="sidebar-divider"></div>
         <div class="sidebar-section image-section">
             <div class="node-name" id="node-name">Name</div>
             <div class="node-image-wrapper">

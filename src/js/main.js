@@ -29,7 +29,7 @@ const visualizerConfig = {
     clamping: 100.0,            //clamping of maximum force applied
     verticalSpacing: 4.0,
     glowEffect: false,
-    rootNodeName: "Root"
+    rootNodeName: "Christ"
 };
 
 // Scene setup
@@ -82,6 +82,7 @@ scene.add(ambientLight);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredNode = null;
+let hoveredMesh = null; // Add this line
 let selectedNode = null;
 
 // Camera controls
@@ -159,15 +160,19 @@ renderer.domElement.addEventListener('mousemove', (event) => {
 
     raycaster.setFromCamera(mouse, camera);
 
-    // Assume visualizer.getNodeMeshes() returns an array of node mesh objects
     const intersects = raycaster.intersectObjects(visualizer.getNodeMeshes());
     if (intersects.length > 0) {
-        hoveredNode = intersects[0].object.userData.nodeData; // store node data
-        // Optionally: visual feedback for hover
-        visualizer.highlightNode(intersects[0].object, true);
+        const mesh = intersects[0].object;
+        if (hoveredMesh && hoveredMesh !== mesh) {
+            visualizer.highlightNode(hoveredMesh, false); // Remove highlight from previous
+        }
+        hoveredNode = mesh.userData.nodeData;
+        hoveredMesh = mesh;
+        visualizer.highlightNode(mesh, true);
     } else {
-        if (hoveredNode) visualizer.highlightNode(hoveredNode.mesh, false);
+        if (hoveredMesh) visualizer.highlightNode(hoveredMesh, false);
         hoveredNode = null;
+        hoveredMesh = null;
     }
 });
 
@@ -192,6 +197,134 @@ renderer.domElement.addEventListener('wheel', (event) => {
     updateCameraPosition();
     event.preventDefault();
 });
+
+
+
+// --- Touch event helpers ---
+function getTouchPos(touch) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    return {
+        x: ((touch.clientX - rect.left) / rect.width) * 2 - 1,
+        y: -((touch.clientY - rect.top) / rect.height) * 2 + 1,
+        clientX: touch.clientX,
+        clientY: touch.clientY
+    };
+}
+
+renderer.domElement.addEventListener('touchstart', (event) => {
+    if (event.touches.length === 1) {
+        mouseDown = true;
+        const touch = event.touches[0];
+        const pos = getTouchPos(touch);
+        mouseX = pos.clientX;
+        mouseY = pos.clientY;
+        mouse.x = pos.x;
+        mouse.y = pos.y;
+        raycaster.setFromCamera(mouse, camera);
+
+        const intersects = raycaster.intersectObjects(visualizer.getNodeMeshes());
+        if (intersects.length > 0) {
+            draggingNode = intersects[0].object.userData.nodeData;
+            dragLayerY = draggingNode.position.y;
+            const mouseWorld = getMouseWorldPositionAtY(mouse, camera, dragLayerY);
+            dragOffset.copy(draggingNode.position).sub(mouseWorld);
+            event.preventDefault();
+        }
+    }
+    // For pinch zoom, store initial distance
+    if (event.touches.length === 2) {
+        mouseDown = false;
+        const dx = event.touches[0].clientX - event.touches[1].clientX;
+        const dy = event.touches[0].clientY - event.touches[1].clientY;
+        renderer._touchZoomDistance = Math.sqrt(dx * dx + dy * dy);
+        renderer._touchZoomRadius = cameraRadius;
+    }
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchmove', (event) => {
+    if (event.touches.length === 1 && mouseDown) {
+        const touch = event.touches[0];
+        const pos = getTouchPos(touch);
+        if (draggingNode) {
+            const mouseWorld = getMouseWorldPositionAtY(pos, camera, dragLayerY);
+            draggingNode.position.copy(mouseWorld.add(dragOffset));
+        } else {
+            const deltaX = pos.clientX - mouseX;
+            const deltaY = pos.clientY - mouseY;
+            cameraTheta += deltaX * 0.01;
+            cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi + deltaY * 0.01));
+            updateCameraPosition();
+            mouseX = pos.clientX;
+            mouseY = pos.clientY;
+        }
+        mouse.x = pos.x;
+        mouse.y = pos.y;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(visualizer.getNodeMeshes());
+        if (intersects.length > 0) {
+            const mesh = intersects[0].object;
+            if (hoveredMesh && hoveredMesh !== mesh) {
+                visualizer.highlightNode(hoveredMesh, false);
+            }
+            hoveredNode = mesh.userData.nodeData;
+            hoveredMesh = mesh;
+            visualizer.highlightNode(mesh, true);
+        } else {
+            if (hoveredMesh) visualizer.highlightNode(hoveredMesh, false);
+            hoveredNode = null;
+            hoveredMesh = null;
+        }
+        event.preventDefault();
+    }
+    // Pinch zoom
+    if (event.touches.length === 2 && renderer._touchZoomDistance) {
+        const dx = event.touches[0].clientX - event.touches[1].clientX;
+        const dy = event.touches[0].clientY - event.touches[1].clientY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const delta = dist - renderer._touchZoomDistance;
+        cameraRadius = Math.max(5, Math.min(70, renderer._touchZoomRadius - delta * 0.05));
+        updateCameraPosition();
+        event.preventDefault();
+    }
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchend', (event) => {
+    if (event.touches.length === 0) {
+        mouseDown = false;
+        draggingNode = null;
+        renderer._touchZoomDistance = null;
+    }
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchcancel', () => {
+    mouseDown = false;
+    draggingNode = null;
+    renderer._touchZoomDistance = null;
+}, { passive: false });
+
+renderer.domElement.addEventListener('touchstart', (event) => {
+    // Tap to select node
+    if (event.touches.length === 1) {
+        const touch = event.touches[0];
+        const pos = getTouchPos(touch);
+        mouse.x = pos.x;
+        mouse.y = pos.y;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(visualizer.getNodeMeshes());
+        if (intersects.length > 0) {
+            hoveredNode = intersects[0].object.userData.nodeData;
+            selectedNode = hoveredNode;
+            cameraConfig.center = selectedNode.position;
+            updateCameraPosition();
+            visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
+            document.getElementById('node-name').innerHTML = selectedNode.name || '';
+            document.getElementById('node-image').src = selectedNode.selfie || '';
+            document.getElementById('node-details').innerHTML = selectedNode.testimonial ? selectedNode.testimonial.replace(/\n/g, '<br>') : '';
+        }
+    }
+}, { passive: false });
+
+
 
 cameraRadius = cameraConfig.radius;
 cameraTheta = cameraConfig.theta;
@@ -220,7 +353,95 @@ composer.addPass(bloomPass);
 const visualizer = new Visualizer(scene, camera, renderer, composer);
 visualizer.updateConfig(visualizerConfig);
 
-// Load and render community data
+// --- Search Bar Functionality ---
+let allMembers = [];
+let searchResultsDropdown = null;
+
+function createSearchDropdown() {
+    if (!searchResultsDropdown) {
+        searchResultsDropdown = document.createElement('div');
+        searchResultsDropdown.id = 'sidebar-search-dropdown';
+        searchResultsDropdown.style.position = 'absolute';
+        searchResultsDropdown.style.left = '20px';
+        searchResultsDropdown.style.right = '20px';
+        searchResultsDropdown.style.top = '56px';
+        searchResultsDropdown.style.background = '#fff';
+        searchResultsDropdown.style.color = '#222';
+        searchResultsDropdown.style.border = '1px solid #bbb';
+        searchResultsDropdown.style.borderRadius = '6px';
+        searchResultsDropdown.style.zIndex = '100';
+        searchResultsDropdown.style.maxHeight = '200px';
+        searchResultsDropdown.style.overflowY = 'auto';
+        searchResultsDropdown.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)';
+        searchResultsDropdown.style.display = 'none';
+        document.getElementById('side-menu').appendChild(searchResultsDropdown);
+    }
+}
+
+function showSearchResults(results) {
+    createSearchDropdown();
+    searchResultsDropdown.innerHTML = '';
+    if (results.length === 0) {
+        searchResultsDropdown.style.display = 'none';
+        return;
+    }
+    results.forEach(member => {
+        const item = document.createElement('div');
+        item.style.padding = '8px 12px';
+        item.style.cursor = 'pointer';
+        item.style.borderBottom = '1px solid #eee';
+        item.textContent = `${member.name || ''} (${member.joinDate || ''})`;
+        item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            selectNodeFromSearch(member);
+            searchResultsDropdown.style.display = 'none';
+            document.getElementById('sidebar-search').value = '';
+        });
+        searchResultsDropdown.appendChild(item);
+    });
+    searchResultsDropdown.style.display = 'block';
+}
+
+function selectNodeFromSearch(member) {
+    // Find the mesh for this member
+    const nodeMeshes = visualizer.getNodeMeshes();
+    const mesh = nodeMeshes.find(m => m.userData.nodeData && m.userData.nodeData.id === member.id);
+    if (mesh) {
+        selectedNode = mesh.userData.nodeData;
+        cameraConfig.center = selectedNode.position;
+        updateCameraPosition();
+        visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
+        document.getElementById('node-name').innerHTML = selectedNode.name || '';
+        document.getElementById('node-image').src = selectedNode.selfie || '';
+        document.getElementById('node-details').innerHTML = selectedNode.testimonial ? selectedNode.testimonial.replace(/\n/g, '<br>') : '';
+    }
+}
+
+function setupSidebarSearch(members) {
+    allMembers = members;
+    createSearchDropdown();
+    const searchInput = document.getElementById('sidebar-search');
+    searchInput.addEventListener('input', function () {
+        const query = this.value.trim().toLowerCase();
+        if (!query) {
+            showSearchResults([]);
+            return;
+        }
+        const results = allMembers.filter(member => {
+            const name = (member.name || '').toLowerCase();
+            const joinDate = (member.joinDate || '').toLowerCase();
+            return name.includes(query) || joinDate.includes(query);
+        });
+        showSearchResults(results.slice(0, 10));
+    });
+    searchInput.addEventListener('blur', function () {
+        setTimeout(() => {
+            if (searchResultsDropdown) searchResultsDropdown.style.display = 'none';
+        }, 150);
+    });
+}
+
+// --- Patch init() to setup search ---
 async function init() {
     try {
         const data = await fetchData();
@@ -233,6 +454,7 @@ async function init() {
             updateCameraPosition();
             document.getElementById('side-menu').style.display = 'block';
             resizeRenderer();
+            setupSidebarSearch(data.members); // <-- Add this line
         }
     } catch (error) {
         console.error('Failed to initialize visualizer:', error);
