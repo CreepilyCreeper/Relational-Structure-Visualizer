@@ -1,7 +1,9 @@
 backend:
-  name: git-gateway
+  name: github
   repo: CreepilyCreeper/Relational-Structure-Visualizer
   branch: main
+  auth_scope: repo
+  client_id: YOUR_CLIENT_ID
 
 media_folder: "static/images/uploads"
 public_folder: "/images/uploads"
