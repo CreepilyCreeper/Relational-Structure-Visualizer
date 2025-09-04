@@ -17,7 +17,7 @@ collections:
     label_singular: "Member"
     description: "Manage community members"
     files:
-      - file: "data/members.json"
+      - file: "src/data/community.json"
         label: "Members List"
         name: "members"
         format: "json"
