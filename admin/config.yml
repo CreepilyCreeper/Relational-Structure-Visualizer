@@ -5,7 +5,7 @@ backend:
   name: github
   repo: CreepilyCreeper/Relational-Structure-Visualizer
   branch: main
-  app_id: Ov23li7JKJ2CH4t9foEA
+  app_id: Ov23li7EPwaGjZQo3FCH
   auth_scope: repo
 
 media_folder: "static/images/uploads"
