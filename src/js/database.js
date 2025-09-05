@@ -1,14 +1,34 @@
-
 // Replace with your sheet's ID and sheet name
 const sheetId = '1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA';
 const sheetName = 'Sheet1';
 const url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
+const selfieDir = './assets/selfies/';
+const fallbackSelfie = 'fallback.png';
 
-// Helper to derive selfie path from name (e.g., 'Layer1-Node1' => 'assets/selfies/layer1-node1.png')
-function deriveSelfiePath(name) {
-    if (!name) return '';
-    return `assets/selfies/${name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '')}.png`;
-}
+// List of common image extensions to check
+const commonExtensions = [
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.ico', '.heic'
+];
+
+/**
+ * Asynchronously finds the first existing selfie image for a member.
+ * @param {string} name - The member's name (used as the filename).
+ * @returns {Promise<string>} - The path to the found selfie image or the fallback.
+ */
+const findSelfiePath = async (name) => {
+    for (const ext of commonExtensions) {
+        const potentialPath = selfieDir + name.replace(/[^a-zA-Z0-9_\-]/g, '_') + ext;
+        try {
+            const response = await fetch(potentialPath, { method: 'HEAD' });
+            if (response.ok) {
+                return potentialPath;
+            }
+        } catch {
+            // Ignore errors and continue to the next extension
+        }
+    }
+    return selfieDir + fallbackSelfie;
+};
 
 /**
  * Fetches community data.
@@ -19,7 +39,7 @@ const fetchData = async (useTestData = false) => {
     if (useTestData) {
         // Load from local test data
         try {
-            const response = await fetch('./data/community.json');
+            const response = await fetch('./data/test_data_community.json');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
@@ -36,14 +56,23 @@ const fetchData = async (useTestData = false) => {
                 throw new Error('Network response was not ok');
             }
             const rows = await response.json();
-            const members = rows.map(row => ({
-                name: row.name,
-                //selfie: deriveSelfiePath(row.name),
-                selfie: row.selfie,
-                joinDate: row.joinDate,
-                referrals: row.referrals ? row.referrals.split(';').map(s => s.trim()).filter(Boolean) : [],
-                testimonial: row.testimonial
+
+            // For each member, resolve the selfie path asynchronously
+            const members = await Promise.all(rows.map(async row => {
+                const name = row.name ? row.name.trim() : '';
+                const selfiePath = await findSelfiePath(name);
+
+                return {
+                    name: name,
+                    selfie: selfiePath,
+                    joinDate: row.joinDate,
+                    referrals: row.referrals
+                        ? row.referrals.split(',').map(s => s.trim()).filter(Boolean)
+                        : [],
+                    testimonial: row.testimonial
+                };
             }));
+
             const communityData = { members };
             // Store in localStorage (static sites can't write to files)
             localStorage.setItem('communityData', JSON.stringify(communityData));

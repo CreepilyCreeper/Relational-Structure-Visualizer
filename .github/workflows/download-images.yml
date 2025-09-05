@@ -1,0 +1,30 @@
+# .github/workflows/download-images.yml
+name: Download and Auto-crop Google Drive Images
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  download_and_crop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: pip install requests opencv-python
+      - name: Download images from Google Drive
+        run: python .github/workflows/download_drive_images.py
+      - name: Crop faces from new/updated images
+        run: python .github/workflows/crop_faces.py
+      - name: Commit and push images and data
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'github-actions@github.com'
+          git add src/assets/selfies/ src/assets/selfiescropped/
+          git commit -m "Update selfies and cropped faces" || echo "No changes"
+          git push

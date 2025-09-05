@@ -75,7 +75,7 @@ for (let l = 1; l <= config.layers; l++) {
   }
 }
 
-fs.writeFileSync('community.json', JSON.stringify({ members }, null, 2));
+fs.writeFileSync('test_data_community2.json', JSON.stringify({ members }, null, 2));
 
 // Generate TSV for Google Sheets
 const tsvRows = [
@@ -83,11 +83,11 @@ const tsvRows = [
   ...members.map(m => {
     // No need to escape quotes for TSV, just join with tabs
     const name = m.name;
-    const selfie = m.selfie;
+    const selfie = '';
     const joinDate = m.joinDate;
-    const referrals = m.referrals.join(';');
+    const referrals = m.referrals.join(', ');
     return [name, selfie, joinDate, referrals].join('\t');
   })
 ];
-fs.writeFileSync('community-sheet.tsv', tsvRows.join('\n'));
-console.log('Generated community.json and community-sheet.tsv with', members.length, 'members.');
+fs.writeFileSync('test_data_community-sheet2.tsv', tsvRows.join('\n'));
+console.log('Generated test_data_community2.json and test_data_community-sheet2.tsv with', members.length, 'members.');

@@ -1,0 +1,176 @@
+name	selfie	joinDate	referrals
+Root		2015	Layer1-Node1, Layer1-Node2, Layer1-Node3, Layer1-Node4, Layer1-Node5, Layer1-Node6, Layer1-Node7, Layer1-Node8, Layer1-Node9, Layer1-Node10, Layer1-Node11, Layer1-Node12, Layer1-Node13, Layer1-Node14, Layer1-Node15, Layer1-Node16, Layer1-Node17, Layer1-Node18, Layer1-Node19, Layer1-Node20, Layer1-Node21, Layer1-Node22, Layer1-Node23, Layer1-Node24, Layer1-Node25
+Layer1-Node1		2016	Layer2-Node18, Layer2-Node1
+Layer1-Node2		2016	Layer2-Node8
+Layer1-Node3		2016	Layer2-Node6, Layer2-Node2
+Layer1-Node4		2016	Layer2-Node7, Layer2-Node13, Layer2-Node16, Layer2-Node20, Layer2-Node11
+Layer1-Node5		2016	Layer2-Node19, Layer2-Node12, Layer2-Node15, Layer2-Node5
+Layer1-Node6		2016	Layer2-Node10, Layer2-Node14
+Layer1-Node7		2016	Layer2-Node17, Layer2-Node9, Layer2-Node4, Layer2-Node3
+Layer1-Node8		2016	Layer3-Node27, Layer3-Node13, Layer3-Node20
+Layer1-Node9		2016	Layer3-Node24
+Layer1-Node10		2016	Layer3-Node15, Layer3-Node4, Layer3-Node10, Layer3-Node19, Layer3-Node7
+Layer1-Node11		2016	Layer3-Node28
+Layer1-Node12		2016	Layer3-Node18, Layer3-Node21, Layer3-Node25, Layer3-Node26
+Layer1-Node13		2016	Layer3-Node23, Layer3-Node9, Layer3-Node14, Layer3-Node3
+Layer1-Node14		2016	Layer3-Node2, Layer3-Node12, Layer3-Node1, Layer3-Node22
+Layer1-Node15		2016	Layer3-Node11, Layer3-Node8, Layer3-Node16, Layer3-Node17
+Layer1-Node16		2016	Layer3-Node29, Layer3-Node6
+Layer1-Node17		2016	Layer3-Node5, Layer4-Node10, Layer4-Node15, Layer4-Node8, Layer4-Node12
+Layer1-Node18		2016	Layer4-Node9
+Layer1-Node19		2016	Layer4-Node2, Layer4-Node1, Layer4-Node14, Layer4-Node4, Layer4-Node3
+Layer1-Node20		2016	Layer4-Node16, Layer4-Node7, Layer4-Node5
+Layer1-Node21		2016	Layer4-Node13
+Layer1-Node22		2016	Layer4-Node11, Layer4-Node6
+Layer1-Node23		2016	
+Layer1-Node24		2016	
+Layer1-Node25		2016	
+Layer2-Node1		2017	Layer5-Node10
+Layer2-Node2		2017	Layer5-Node15, Layer5-Node1, Layer5-Node7, Layer5-Node2, Layer5-Node4
+Layer2-Node3		2017	Layer5-Node13, Layer5-Node6, Layer5-Node5, Layer5-Node14, Layer5-Node11
+Layer2-Node4		2017	Layer5-Node8, Layer5-Node16, Layer5-Node12, Layer5-Node9
+Layer2-Node5		2017	Layer5-Node3
+Layer2-Node6		2017	Layer5-Node17
+Layer2-Node7		2017	
+Layer2-Node8		2017	
+Layer2-Node9		2017	
+Layer2-Node10		2017	
+Layer2-Node11		2017	
+Layer2-Node12		2017	
+Layer2-Node13		2017	
+Layer2-Node14		2017	
+Layer2-Node15		2017	
+Layer2-Node16		2017	
+Layer2-Node17		2017	
+Layer2-Node18		2017	
+Layer2-Node19		2017	
+Layer2-Node20		2017	
+Layer3-Node1		2018	Layer6-Node25, Layer6-Node18
+Layer3-Node2		2018	Layer6-Node23, Layer6-Node21, Layer6-Node7
+Layer3-Node3		2018	Layer6-Node11, Layer6-Node10, Layer6-Node8, Layer6-Node17
+Layer3-Node4		2018	Layer6-Node19, Layer6-Node3
+Layer3-Node5		2018	Layer6-Node2, Layer6-Node4, Layer6-Node9, Layer6-Node26, Layer6-Node13
+Layer3-Node6		2018	Layer6-Node14, Layer6-Node6, Layer6-Node1
+Layer3-Node7		2018	Layer6-Node15, Layer6-Node20, Layer6-Node22
+Layer3-Node8		2018	Layer6-Node24, Layer6-Node5, Layer6-Node12
+Layer3-Node9		2018	Layer6-Node16
+Layer3-Node10		2018	
+Layer3-Node11		2018	
+Layer3-Node12		2018	
+Layer3-Node13		2018	
+Layer3-Node14		2018	
+Layer3-Node15		2018	
+Layer3-Node16		2018	
+Layer3-Node17		2018	
+Layer3-Node18		2018	
+Layer3-Node19		2018	
+Layer3-Node20		2018	
+Layer3-Node21		2018	
+Layer3-Node22		2018	
+Layer3-Node23		2018	
+Layer3-Node24		2018	
+Layer3-Node25		2018	
+Layer3-Node26		2018	
+Layer3-Node27		2018	
+Layer3-Node28		2018	
+Layer3-Node29		2018	
+Layer4-Node1		2019	Layer7-Node13
+Layer4-Node2		2019	Layer7-Node7, Layer7-Node3, Layer7-Node10, Layer7-Node17, Layer7-Node4
+Layer4-Node3		2019	Layer7-Node5, Layer7-Node15
+Layer4-Node4		2019	Layer7-Node2, Layer7-Node11
+Layer4-Node5		2019	Layer7-Node8, Layer7-Node14, Layer7-Node1, Layer7-Node18
+Layer4-Node6		2019	Layer7-Node12, Layer7-Node9, Layer7-Node16, Layer7-Node6
+Layer4-Node7		2019	
+Layer4-Node8		2019	
+Layer4-Node9		2019	
+Layer4-Node10		2019	
+Layer4-Node11		2019	
+Layer4-Node12		2019	
+Layer4-Node13		2019	
+Layer4-Node14		2019	
+Layer4-Node15		2019	
+Layer4-Node16		2019	
+Layer5-Node1		2020	Layer8-Node12, Layer8-Node9
+Layer5-Node2		2020	Layer8-Node8, Layer8-Node7, Layer8-Node20
+Layer5-Node3		2020	Layer8-Node13, Layer8-Node3
+Layer5-Node4		2020	Layer8-Node17, Layer8-Node19
+Layer5-Node5		2020	Layer8-Node4, Layer8-Node6, Layer8-Node22, Layer8-Node23, Layer8-Node14
+Layer5-Node6		2020	Layer8-Node18, Layer8-Node1
+Layer5-Node7		2020	Layer8-Node2, Layer8-Node15, Layer8-Node21, Layer8-Node10
+Layer5-Node8		2020	Layer8-Node5, Layer8-Node11
+Layer5-Node9		2020	Layer8-Node16
+Layer5-Node10		2020	
+Layer5-Node11		2020	
+Layer5-Node12		2020	
+Layer5-Node13		2020	
+Layer5-Node14		2020	
+Layer5-Node15		2020	
+Layer5-Node16		2020	
+Layer5-Node17		2020	
+Layer6-Node1		2021	
+Layer6-Node2		2021	
+Layer6-Node3		2021	
+Layer6-Node4		2021	
+Layer6-Node5		2021	
+Layer6-Node6		2021	
+Layer6-Node7		2021	
+Layer6-Node8		2021	
+Layer6-Node9		2021	
+Layer6-Node10		2021	
+Layer6-Node11		2021	
+Layer6-Node12		2021	
+Layer6-Node13		2021	
+Layer6-Node14		2021	
+Layer6-Node15		2021	
+Layer6-Node16		2021	
+Layer6-Node17		2021	
+Layer6-Node18		2021	
+Layer6-Node19		2021	
+Layer6-Node20		2021	
+Layer6-Node21		2021	
+Layer6-Node22		2021	
+Layer6-Node23		2021	
+Layer6-Node24		2021	
+Layer6-Node25		2021	
+Layer6-Node26		2021	
+Layer7-Node1		2022	
+Layer7-Node2		2022	
+Layer7-Node3		2022	
+Layer7-Node4		2022	
+Layer7-Node5		2022	
+Layer7-Node6		2022	
+Layer7-Node7		2022	
+Layer7-Node8		2022	
+Layer7-Node9		2022	
+Layer7-Node10		2022	
+Layer7-Node11		2022	
+Layer7-Node12		2022	
+Layer7-Node13		2022	
+Layer7-Node14		2022	
+Layer7-Node15		2022	
+Layer7-Node16		2022	
+Layer7-Node17		2022	
+Layer7-Node18		2022	
+Layer8-Node1		2023	
+Layer8-Node2		2023	
+Layer8-Node3		2023	
+Layer8-Node4		2023	
+Layer8-Node5		2023	
+Layer8-Node6		2023	
+Layer8-Node7		2023	
+Layer8-Node8		2023	
+Layer8-Node9		2023	
+Layer8-Node10		2023	
+Layer8-Node11		2023	
+Layer8-Node12		2023	
+Layer8-Node13		2023	
+Layer8-Node14		2023	
+Layer8-Node15		2023	
+Layer8-Node16		2023	
+Layer8-Node17		2023	
+Layer8-Node18		2023	
+Layer8-Node19		2023	
+Layer8-Node20		2023	
+Layer8-Node21		2023	
+Layer8-Node22		2023	
+Layer8-Node23		2023	
