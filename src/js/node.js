@@ -55,7 +55,7 @@ class Node {
         if (this.data.selfiecropped && this.data.name) {
             // 1. Use a fallback texture first (solid color or default image)
             const fallbackTexture = new THREE.TextureLoader().load('./assets/selfies/fallback.png'); // or use a solid color canvas
-            const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
+            const spriteMaterial = new THREE.SpriteMaterial({depthTest: false });
             this.sprite = new THREE.Sprite(spriteMaterial);
             this.sprite.renderOrder = 999;
             // Start hidden if not in cropped mode
