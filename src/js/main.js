@@ -533,4 +533,60 @@ function animateSpriteScale(targetScale, duration = 400) {
     animate();
 }
 
+// --- Node name label overlay logic ---
+let showNodeLabels = false;
+const toggleNamesBtn = document.getElementById('toggle-names');
+const nodeLabelsContainer = document.getElementById('node-labels-container');
+
+toggleNamesBtn.addEventListener('click', () => {
+    showNodeLabels = !showNodeLabels;
+    toggleNamesBtn.textContent = showNodeLabels ? "Hide Names" : "Show Names";
+    nodeLabelsContainer.style.display = showNodeLabels ? "block" : "none";
+});
+
+function updateNodeLabels() {
+    if (!showNodeLabels) {
+        nodeLabelsContainer.innerHTML = '';
+        return;
+    }
+    const rect = renderer.domElement.getBoundingClientRect();
+    nodeLabelsContainer.innerHTML = '';
+    visualizer.nodes.forEach(node => {
+        if (!node.isPlaced) return;
+        // Project 3D position to 2D screen
+        const pos = node.position.clone();
+        pos.project(camera);
+        const x = (pos.x * 0.5 + 0.5) * rect.width + rect.left;
+        const y = (-pos.y * 0.5 + 0.5) * rect.height + rect.top;
+        const label = document.createElement('div');
+        label.className = 'node-label';
+        label.textContent = node.data.name;
+        label.style.left = `${x}px`;
+        label.style.top = `${y - 18}px`; // above node
+        nodeLabelsContainer.appendChild(label);
+    });
+}
+
+// --- Patch animation/render loop to update labels ---
+const oldRender = visualizer.composer
+    ? visualizer.composer.render.bind(visualizer.composer)
+    : renderer.render.bind(renderer);
+
+function renderWithLabels() {
+    oldRender();
+    updateNodeLabels();
+    requestAnimationFrame(renderWithLabels);
+}
+
+// Only start our custom loop after visualizer.renderTree is called
+const origRenderTree = visualizer.renderTree.bind(visualizer);
+visualizer.renderTree = async function(...args) {
+    const result = await origRenderTree(...args);
+    if (!window._labelsRenderLoopStarted) {
+        window._labelsRenderLoopStarted = true;
+        renderWithLabels();
+    }
+    return result;
+};
+
 
