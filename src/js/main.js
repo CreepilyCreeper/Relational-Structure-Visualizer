@@ -477,7 +477,7 @@ const croppedToggle = document.getElementById('cropped-toggle');
 let croppedMode = false;
 croppedToggle.addEventListener('click', () => {
     croppedMode = !croppedMode;
-    croppedToggle.textContent = croppedMode ? "Show Original Images" : "Show Cropped Images";
+    croppedToggle.textContent = croppedMode ? "Show Selfies" : "Remove Selfies";
     visualizer.setUseCroppedImages(croppedMode);
 
     // Animate sprite scale instead of re-rendering
