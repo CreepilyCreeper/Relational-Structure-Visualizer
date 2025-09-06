@@ -33,6 +33,17 @@ const findSelfiePath = async (name) => {
     return selfieDir + fallbackSelfie;
 };
 
+// Derive selfieCroppedPath from selfiePath
+function getSelfieCroppedPath(selfiePath, name) {
+    if (!selfiePath || !name) return '';
+    // Extract extension from selfiePath
+    const extMatch = selfiePath.match(/\.[^/.]+$/);
+    const ext = extMatch ? extMatch[0] : '';
+    // Sanitize name to match your naming convention
+    const safeName = name.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    return `./assets/selfiescropped/${safeName}_CROPPED${ext}`;
+}
+
 /**
  * Fetches community data.
  * @param {boolean} useTestData - If true, loads from community.json. If false, loads from Google Sheets.
@@ -69,10 +80,12 @@ const fetchData = async (useTestData = false) => {
             //console.log(`Processing member: ${name}`);
             const selfiePath = await findSelfiePath(name);
             //console.log(`Selfie path for ${name}: ${selfiePath}`);
+            console.log(`Selfie cropped path for ${name}: ${getSelfieCroppedPath(selfiePath, name)}`);
 
             return {
                 name: name,
                 selfie: selfiePath,
+                selfiecropped: getSelfieCroppedPath(selfiePath, name),
                 joinDate: row.joinDate,
                 referrals: row.referrals
                 ? row.referrals.split(',').map(s => s.trim()).filter(Boolean)

@@ -118,20 +118,21 @@ renderer.domElement.addEventListener('mousedown', (event) => {
     mouseX = event.clientX;
     mouseY = event.clientY;
 
-    // Calculate normalized device coordinates
     mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
     mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
     const intersects = raycaster.intersectObjects(visualizer.getNodeMeshes());
     if (intersects.length > 0) {
-        draggingNode = intersects[0].object.userData.nodeData;
-        dragLayerY = draggingNode.position.y;
-        // Compute offset between node position and mouse world position
-        const mouseWorld = getMouseWorldPositionAtY(mouse, camera, dragLayerY);
-        dragOffset.copy(draggingNode.position).sub(mouseWorld);
-        // Prevent camera drag if node drag starts
-        event.stopPropagation();
+        // Accept either mesh or sprite
+        const nodeData = intersects[0].object.userData.nodeData;
+        if (nodeData) {
+            draggingNode = nodeData;
+            dragLayerY = draggingNode.position.y;
+            const mouseWorld = getMouseWorldPositionAtY(mouse, camera, dragLayerY);
+            dragOffset.copy(draggingNode.position).sub(mouseWorld);
+            event.stopPropagation();
+        }
     }
 });
 
@@ -252,7 +253,7 @@ renderer.domElement.addEventListener('touchmove', (event) => {
             const deltaX = pos.clientX - mouseX;
             const deltaY = pos.clientY - mouseY;
             cameraTheta += deltaX * 0.01;
-            cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi + deltaY * 0.01));
+            cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi - deltaY * 0.01));
             updateCameraPosition();
             mouseX = pos.clientX;
             mouseY = pos.clientY;
@@ -470,5 +471,66 @@ window.addEventListener('resize', () => {
 });
 
 init();
+
+// Toggle cropped images
+const croppedToggle = document.getElementById('cropped-toggle');
+let croppedMode = false;
+croppedToggle.addEventListener('click', () => {
+    croppedMode = !croppedMode;
+    croppedToggle.textContent = croppedMode ? "Show Original Images" : "Show Cropped Images";
+    visualizer.setUseCroppedImages(croppedMode);
+
+    // Animate sprite scale instead of re-rendering
+    const scale = parseFloat(document.getElementById('sprite-scale-slider').value);
+    animateSpriteScale(scale, 400);
+});
+
+const spriteScaleSlider = document.getElementById('sprite-scale-slider');
+spriteScaleSlider.addEventListener('input', (e) => {
+    const scale = parseFloat(e.target.value);
+    // Only update scale for visible sprites
+    visualizer.nodes.forEach(node => {
+        if (node.sprite && node.sprite.visible) {
+            node.setSpriteScale(scale);
+        }
+    });
+});
+
+function animateSpriteScale(targetScale, duration = 400) {
+    const nodes = visualizer.nodes;
+    const startTime = performance.now();
+    const initialScales = nodes.map(node => node.sprite ? node.sprite.scale.x / node.originalScale : 0);
+
+    function animate() {
+        const now = performance.now();
+        const t = Math.min(1, (now - startTime) / duration);
+        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // easeInOut
+
+        nodes.forEach((node, i) => {
+            if (node.sprite) {
+                const from = initialScales[i];
+                const to = targetScale;
+                const scale = croppedMode
+                    ? from + (to - from) * ease
+                    : from + (0 - from) * ease;
+                node.setSpriteScale(scale);
+                node.sprite.visible = scale > 0.01;
+            }
+        });
+
+        if (t < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            // Ensure final state
+            nodes.forEach(node => {
+                if (node.sprite) {
+                    node.setSpriteScale(croppedMode ? targetScale : 0);
+                    node.sprite.visible = croppedMode;
+                }
+            });
+        }
+    }
+    animate();
+}
 
 

@@ -159,3 +159,35 @@ body {
     outline: none;
     box-sizing: border-box;
 }
+
+#bottom-controls {
+    position: fixed;
+    bottom: 0.5vw;
+    left: 0.5vw;
+    z-index: 1000;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.25vw; /* or use gap: 1em; for spacing between controls */
+}
+
+#cropped-toggle,
+#sprite-scale-container {
+    background: #222;
+    color: #fff;
+    border-radius: 0.8vw;
+    user-select: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    font-size: clamp(0.5em, 5vw, 1em);
+    padding: clamp(10px, 1.5vw, 20px) clamp(5px, 5vw, 20px);
+    display: flex;
+    align-items: center;
+}
+
+#sprite-scale-container label,
+#sprite-scale-container input[type="range"] {
+    font-size: clamp(0.5em, 5vw, 1em);
+}
+
+#sprite-scale-slider {
+    width: clamp(60px, 10vw, 120px);
+}

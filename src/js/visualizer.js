@@ -46,6 +46,11 @@ class Visualizer {
         this.iter = 0;
         this.clampVectorMax = new THREE.Vector3(this.config.clamping, this.config.clamping, this.config.clamping);
         this.clampVectorMin = new THREE.Vector3(-this.config.clamping, -this.config.clamping, -this.config.clamping);
+        this.useCroppedImages = false; // <-- Add this line
+    }
+
+    setUseCroppedImages(flag) {
+        this.useCroppedImages = flag;
     }
 
     async renderTree(data) {
@@ -60,6 +65,7 @@ class Visualizer {
         // Create nodes first and add to scene immediately
         data.forEach(person => {
             const node = new Node(person, this.config);
+            node.useCroppedImage = this.useCroppedImages; // <-- Add this line
             nodeMap.set(person.name, node);
             this.nodes.push(node);
         });
@@ -72,6 +78,7 @@ class Visualizer {
 
         // Create meshes for all nodes and add to scene
         for (const node of this.nodes) {
+            node.useCroppedImage = this.useCroppedImages; // <-- Add this line
             const mesh = await node.createNode(allYears);
             mesh.position.copy(node.position);
             mesh.scale.set(1, 1, 1);
@@ -418,18 +425,28 @@ class Visualizer {
 
     // 1. Return all node meshes for raycasting
     getNodeMeshes() {
-        return this.nodes
-            .filter(node => node.mesh)
-            .map(node => {
-                // Attach nodeData and mesh reference for hover/select logic
+        const objects = [];
+        this.nodes.forEach(node => {
+            if (node.mesh) {
                 node.mesh.userData.nodeData = {
                     ...node.data,
                     mesh: node.mesh,
                     position: node.position,
                     nodeRef: node
                 };
-                return node.mesh;
-            });
+                objects.push(node.mesh);
+            }
+            if (node.sprite && node.sprite.visible) {
+                node.sprite.userData.nodeData = {
+                    ...node.data,
+                    mesh: node.mesh,
+                    position: node.position,
+                    nodeRef: node
+                };
+                objects.push(node.sprite);
+            }
+        });
+        return objects;
     }
 
     // 2. Highlight or unhighlight a node mesh (e.g., on hover)
@@ -486,6 +503,14 @@ class Visualizer {
                 currentNode = parent.data;
             });
         }
+    }
+
+    setAllSpriteScales(scale) {
+        this.nodes.forEach(node => {
+            if (typeof node.setSpriteScale === "function") {
+                node.setSpriteScale(scale);
+            }
+        });
     }
 }
 
