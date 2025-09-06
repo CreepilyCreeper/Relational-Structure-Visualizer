@@ -17,16 +17,16 @@ const commonExtensions = [
  */
 const findSelfiePath = async (name) => {
     for (const ext of commonExtensions) {
-        const potentialPath = selfieDir + name.replace(/[^a-zA-Z0-9_\-]/g, '_') + ext;
+        // Allow Unicode (including Chinese) in filenames, only replace illegal file chars
+        const safeName = name.replace(/[\/\\:*?"<>|]/g, '_');
+        const potentialPath = selfieDir + safeName + ext;
         try {
             const response = await fetch(potentialPath, { method: 'HEAD' });
             if (response.ok) {
-                //console.log(`Found selfie for ${name}: ${potentialPath}`);
                 return potentialPath;
             }
         } catch {
-            //console.log(`Error checking selfie for ${name} with extension ${ext}`);
-            // Ignore errors and continue to the next extension
+            // Ignore errors and continue
         }
     }
     console.log(`Using fallback selfie for ${name}`);
@@ -36,11 +36,10 @@ const findSelfiePath = async (name) => {
 // Derive selfieCroppedPath from selfiePath
 function getSelfieCroppedPath(selfiePath, name) {
     if (!selfiePath || !name) return '';
-    // Extract extension from selfiePath
     const extMatch = selfiePath.match(/\.[^/.]+$/);
     const ext = extMatch ? extMatch[0] : '';
-    // Sanitize name to match your naming convention
-    const safeName = name.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    // Allow Unicode (including Chinese) in filenames, only replace illegal file chars
+    const safeName = name.replace(/[\/\\:*?"<>|]/g, '_');
     return `./assets/selfiescropped/${safeName}_CROPPED${ext}`;
 }
 

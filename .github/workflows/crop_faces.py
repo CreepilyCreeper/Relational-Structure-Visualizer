@@ -1,13 +1,28 @@
 import cv2
 import os
 import json
+import numpy as np  # <-- Add numpy for imdecode workaround
 
 SELFIE_CROPPED_DIR = "src/assets/selfiescropped"
 WORKFLOWS_DIR = os.path.dirname(__file__)
 TO_CROP_LIST = os.path.join(WORKFLOWS_DIR, "to_crop_images.json")
 
+def imread_unicode(path):
+    # Read image with non-ASCII path using imdecode workaround
+    try:
+        with open(path, 'rb') as f:
+            data = f.read()
+        img_array = np.frombuffer(data, np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        return img
+    except Exception as e:
+        print(f"Error reading {path}: {e}")
+        return None
+
 def crop_face(image_path, output_path):
-    img = cv2.imread(image_path)
+    # Normalize and get absolute path
+    image_path = os.path.abspath(os.path.normpath(image_path))
+    img = imread_unicode(image_path)  # Use robust imread
     if img is None:
         print(f"Could not read {image_path}")
         return
