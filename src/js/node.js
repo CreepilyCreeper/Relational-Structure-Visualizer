@@ -51,30 +51,40 @@ class Node {
             nodeInstance: this
         };
         
-        // --- Add Sprite for Cropped Image ---
+        // --- Add Sprite for Cropped Image with fallback ---
         if (this.data.selfiecropped && this.data.name) {
-            const texture = await this.loadTexturePromise(this.data.selfiecropped);
-            if (texture) {
-                const spriteMaterial = new THREE.SpriteMaterial({ map: texture, depthTest: false });
-                this.sprite = new THREE.Sprite(spriteMaterial);
-                this.sprite.renderOrder = 999; // Ensure sprites render above lines
-                // Start hidden if not in cropped mode
-                const initialScale = (this.useCroppedImage ? this.spriteScale : 0);
-                this.sprite.scale.set(this.originalScale * initialScale, this.originalScale * initialScale, 1);
-                this.sprite.center.set(0.5, 0.5);
-                this.sprite.visible = this.useCroppedImage;
-                this.mesh.add(this.sprite);
+            // 1. Use a fallback texture first (solid color or default image)
+            const fallbackTexture = new THREE.TextureLoader().load('./assets/selfies/fallback.png'); // or use a solid color canvas
+            const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
+            this.sprite = new THREE.Sprite(spriteMaterial);
+            this.sprite.renderOrder = 999;
+            // Start hidden if not in cropped mode
+            const initialScale = (this.useCroppedImage ? this.spriteScale : 0);
+            this.sprite.scale.set(this.originalScale * initialScale, this.originalScale * initialScale, 1);
+            this.sprite.center.set(0.5, 0.5);
+            this.sprite.visible = this.useCroppedImage;
+            this.mesh.add(this.sprite);
 
-                // Add user data to sprite for interactions
-                this.sprite.userData = {
-                    name: this.data.name,
-                    joinDate: this.data.joinDate,
-                    referrals: this.data.referrals || [],
-                    selfie: this.data.selfie,
-                    selfiecropped: this.data.selfiecropped,
-                    nodeInstance: this
-                };
-            }
+            // Add user data to sprite for interactions
+            this.sprite.userData = {
+                name: this.data.name,
+                joinDate: this.data.joinDate,
+                referrals: this.data.referrals || [],
+                selfie: this.data.selfie,
+                selfiecropped: this.data.selfiecropped,
+                nodeInstance: this
+            };
+
+            // 2. Load the real image in the background
+            this.loadTexturePromise(this.data.selfiecropped)
+                .then(texture => {
+                    // 3. Swap in the real texture when loaded
+                    this.sprite.material.map = texture;
+                    this.sprite.material.needsUpdate = true;
+                })
+                .catch(() => {
+                    // Optionally handle error (keep fallback)
+                });
         }
         
         return this.mesh;
