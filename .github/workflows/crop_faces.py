@@ -26,11 +26,17 @@ def main():
     os.makedirs(SELFIE_CROPPED_DIR, exist_ok=True)
     with open(TO_CROP_LIST, "r") as f:
         to_crop_images = json.load(f)
-    for img_path in to_crop_images:
+    # Make a copy to iterate over since we'll modify the list
+    images_to_process = to_crop_images.copy()
+    for img_path in images_to_process:
         base = os.path.basename(img_path)
         name, ext = os.path.splitext(base)
         output_path = os.path.join(SELFIE_CROPPED_DIR, f"{name}_CROPPED{ext}")
         crop_face(img_path, output_path)
+        # Remove the entry from to_crop_images.json after processing
+        to_crop_images.remove(img_path)
+        with open(TO_CROP_LIST, "w") as f:
+            json.dump(to_crop_images, f)
 
 if __name__ == "__main__":
     main()

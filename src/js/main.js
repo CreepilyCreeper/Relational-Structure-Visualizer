@@ -19,12 +19,12 @@ const visualizerConfig = {
     nodeSize: 0.2,
     nodeColor: 0xffffff,
     linkHighlightColor: 0xff0000, // configurable highlight color
-    layerTension: -100.0,    //always do negative
+    layerTension: -75.0,    //always do negative
     firstLayerTension: -10,
     nodeRepulsion: 50,
-    sameParentRepulsion: 1,
-    firstLayerRepulsion: 1,
-    sameParentSpringLength: 2.0,
+    firstLayerRepulsion: 10,
+    sameParentRepulsion: 2, //feeds into hooke's law
+    sameParentSpringLength: 2.5, //feeds into hooke's law
     damping: 0.2,             //0 is max damping, positive is less damping
     clamping: 100.0,            //clamping of maximum force applied
     verticalSpacing: 4.0,

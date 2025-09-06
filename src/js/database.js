@@ -21,12 +21,15 @@ const findSelfiePath = async (name) => {
         try {
             const response = await fetch(potentialPath, { method: 'HEAD' });
             if (response.ok) {
+                //console.log(`Found selfie for ${name}: ${potentialPath}`);
                 return potentialPath;
             }
         } catch {
+            //console.log(`Error checking selfie for ${name} with extension ${ext}`);
             // Ignore errors and continue to the next extension
         }
     }
+    console.log(`Using fallback selfie for ${name}`);
     return selfieDir + fallbackSelfie;
 };
 
@@ -53,29 +56,35 @@ const fetchData = async (useTestData = false) => {
         try {
             const response = await fetch(url);
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+            throw new Error('Network response was not ok');
             }
             const rows = await response.json();
 
-            // For each member, resolve the selfie path asynchronously
-            const members = await Promise.all(rows.map(async row => {
-                const name = row.name ? row.name.trim() : '';
-                const selfiePath = await findSelfiePath(name);
+            // Filter out rows with no name
+            const filteredRows = rows.filter(row => row.name && row.name.trim());
 
-                return {
-                    name: name,
-                    selfie: selfiePath,
-                    joinDate: row.joinDate,
-                    referrals: row.referrals
-                        ? row.referrals.split(',').map(s => s.trim()).filter(Boolean)
-                        : [],
-                    testimonial: row.testimonial
-                };
+            // For each member, resolve the selfie path asynchronously
+            const members = await Promise.all(filteredRows.map(async row => {
+            const name = row.name.trim();
+            //console.log(`Processing member: ${name}`);
+            const selfiePath = await findSelfiePath(name);
+            //console.log(`Selfie path for ${name}: ${selfiePath}`);
+
+            return {
+                name: name,
+                selfie: selfiePath,
+                joinDate: row.joinDate,
+                referrals: row.referrals
+                ? row.referrals.split(',').map(s => s.trim()).filter(Boolean)
+                : [],
+                testimonial: row.testimonial
+            };
             }));
 
             const communityData = { members };
             // Store in localStorage (static sites can't write to files)
             localStorage.setItem('communityData', JSON.stringify(communityData));
+            console.log(JSON.stringify(communityData, null, 2));
             return communityData;
         } catch (error) {
             console.error('Error fetching Google Sheets data:', error);

@@ -3,6 +3,7 @@ import requests
 import os
 import mimetypes
 import json
+import shutil
 
 SHEET_URL = "https://opensheet.elk.sh/1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA/Sheet1"
 SELFIE_DIR = "src/assets/selfies"
@@ -97,17 +98,45 @@ def main():
                 continue
             # Only download if file_id is new or changed for this name
             if downloaded_images.get(name) != file_id:
-                filename = sanitize_filename(name)
-                selfie_file = f"{filename}"
-                selfie_path = os.path.join(SELFIE_DIR, selfie_file)
-                selfie_file, changed = download_drive_image(file_id, selfie_path)
-                if changed and selfie_file != FALLBACK_IMAGE:
-                    selfie_full_path = os.path.join(SELFIE_DIR, selfie_file)
-                    if selfie_full_path not in to_crop_images:
-                        to_crop_images.append(selfie_full_path)
-                        save_to_crop_images(to_crop_images)
-                    updated_downloaded_images[name] = file_id
-                    save_downloaded_images(updated_downloaded_images, "add", name, file_id)
+                # Check if file_id exists under another name
+                found_existing = False
+                for other_name, other_file_id in downloaded_images.items():
+                    if other_file_id == file_id:
+                        # Found existing file, copy it
+                        filename = sanitize_filename(name)
+                        selfie_file = f"{filename}"
+                        # Find the extension of the existing file
+                        for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".tiff", ".ico", ".heic"]:
+                            src_path = os.path.join(SELFIE_DIR, sanitize_filename(other_name) + ext)
+                            if os.path.exists(src_path):
+                                dest_path = os.path.join(SELFIE_DIR, selfie_file + ext)
+                                shutil.copy2(src_path, dest_path)
+                                print(f"Copied {src_path} to {dest_path} for {name}")
+                                selfie_file = selfie_file + ext
+                                selfie_full_path = dest_path
+                                found_existing = True
+                                break
+                        if found_existing:
+                            # Update mappings and crop list
+                            updated_downloaded_images[name] = file_id
+                            save_downloaded_images(updated_downloaded_images, "add", name, file_id)
+                            if selfie_full_path not in to_crop_images:
+                                to_crop_images.append(selfie_full_path)
+                                save_to_crop_images(to_crop_images)
+                        break
+                if not found_existing:
+                    # Not found, download as before
+                    filename = sanitize_filename(name)
+                    selfie_file = f"{filename}"
+                    selfie_path = os.path.join(SELFIE_DIR, selfie_file)
+                    selfie_file, changed = download_drive_image(file_id, selfie_path)
+                    if changed and selfie_file != FALLBACK_IMAGE:
+                        selfie_full_path = os.path.join(SELFIE_DIR, selfie_file)
+                        if selfie_full_path not in to_crop_images:
+                            to_crop_images.append(selfie_full_path)
+                            save_to_crop_images(to_crop_images)
+                        updated_downloaded_images[name] = file_id
+                        save_downloaded_images(updated_downloaded_images, "add", name, file_id)
             else:
                 print(f"Skipping {name}, already downloaded file_id {file_id}")
         # else: skip if no selfie_url or name
