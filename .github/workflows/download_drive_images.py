@@ -5,10 +5,11 @@ import mimetypes
 import json
 
 SHEET_URL = "https://opensheet.elk.sh/1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA/Sheet1"
-SELFIE_DIR = "../../../src/assets/selfies"
-CHANGED_LIST = "changed_images.json"
+SELFIE_DIR = "src/assets/selfies"
+WORKFLOWS_DIR = os.path.dirname(__file__)
+DOWNLOADED_IMAGES = os.path.join(WORKFLOWS_DIR, "downloaded_images.json")
+TO_CROP_LIST = os.path.join(WORKFLOWS_DIR, "to_crop_images.json")
 FALLBACK_IMAGE = "fallback.png"
-DOWNLOADED_IMAGES = "downloaded_images.json"
 
 def get_drive_file_id(url):
     if "id=" in url:
@@ -47,6 +48,25 @@ def download_drive_image(file_id, dest_path):
 def sanitize_filename(name):
     return "".join(c for c in name if c.isalnum() or c in (' ', '_', '-')).rstrip().replace(" ", "_")
 
+def save_downloaded_images(downloaded_images, action, name=None, file_id=None):
+    if not os.path.exists(DOWNLOADED_IMAGES):
+        print(f"[DEBUG] Creating {DOWNLOADED_IMAGES}")
+    else:
+        print(f"[DEBUG] Modifying {DOWNLOADED_IMAGES}")
+    if action == "add":
+        print(f"[DEBUG] Added/Updated: {name} -> {file_id}")
+    with open(DOWNLOADED_IMAGES, "w") as f:
+        json.dump(downloaded_images, f, indent=2)
+
+def save_to_crop_images(to_crop_images):
+    if not os.path.exists(TO_CROP_LIST):
+        print(f"[DEBUG] Creating {TO_CROP_LIST}")
+    else:
+        print(f"[DEBUG] Modifying {TO_CROP_LIST}")
+    with open(TO_CROP_LIST, "w") as f:
+        json.dump(to_crop_images, f)
+    print(f"[DEBUG] Images to crop (live update): {to_crop_images}")
+
 def main():
     os.makedirs(SELFIE_DIR, exist_ok=True)
     data = requests.get(SHEET_URL).json()
@@ -57,7 +77,13 @@ def main():
     else:
         downloaded_images = {}
 
-    changed_images = []
+    # Load or initialize to_crop_images
+    if os.path.exists(TO_CROP_LIST):
+        with open(TO_CROP_LIST, "r") as f:
+            to_crop_images = json.load(f)
+    else:
+        to_crop_images = []
+
     updated_downloaded_images = downloaded_images.copy()
 
     for row in data:
@@ -76,19 +102,18 @@ def main():
                 selfie_path = os.path.join(SELFIE_DIR, selfie_file)
                 selfie_file, changed = download_drive_image(file_id, selfie_path)
                 if changed and selfie_file != FALLBACK_IMAGE:
-                    changed_images.append(os.path.join(SELFIE_DIR, selfie_file))
+                    selfie_full_path = os.path.join(SELFIE_DIR, selfie_file)
+                    if selfie_full_path not in to_crop_images:
+                        to_crop_images.append(selfie_full_path)
+                        save_to_crop_images(to_crop_images)
                     updated_downloaded_images[name] = file_id
+                    save_downloaded_images(updated_downloaded_images, "add", name, file_id)
             else:
                 print(f"Skipping {name}, already downloaded file_id {file_id}")
         # else: skip if no selfie_url or name
 
-    # Save updated mapping
-    with open(DOWNLOADED_IMAGES, "w") as f:
-        json.dump(updated_downloaded_images, f, indent=2)
-    # Output changed images list for next job
-    with open(CHANGED_LIST, "w") as f:
-        json.dump(changed_images, f)
-    print(f"Changed images: {changed_images}")
+    # Final save to ensure all changes are written
+    save_to_crop_images(to_crop_images)
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,8 @@ import os
 import json
 
 SELFIE_CROPPED_DIR = "src/assets/selfiescropped"
-CHANGED_LIST = "changed_images.json"
+WORKFLOWS_DIR = os.path.dirname(__file__)
+TO_CROP_LIST = os.path.join(WORKFLOWS_DIR, "to_crop_images.json")
 
 def crop_face(image_path, output_path):
     img = cv2.imread(image_path)
@@ -23,9 +24,9 @@ def crop_face(image_path, output_path):
 
 def main():
     os.makedirs(SELFIE_CROPPED_DIR, exist_ok=True)
-    with open(CHANGED_LIST, "r") as f:
-        changed_images = json.load(f)
-    for img_path in changed_images:
+    with open(TO_CROP_LIST, "r") as f:
+        to_crop_images = json.load(f)
+    for img_path in to_crop_images:
         base = os.path.basename(img_path)
         name, ext = os.path.splitext(base)
         output_path = os.path.join(SELFIE_CROPPED_DIR, f"{name}_CROPPED{ext}")
