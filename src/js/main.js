@@ -187,7 +187,7 @@ renderer.domElement.addEventListener('click', (event) => {
         visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
 
         // --- Show side menu with node data ---
-        document.getElementById('node-name').innerHTML = selectedNode.name || '';
+        document.getElementById('node-name').innerHTML = `${selectedNode.name || ''} (${selectedNode.joinDate || ''})`;
         document.getElementById('node-image').src = selectedNode.selfie || '';
         document.getElementById('node-details').innerHTML = selectedNode.testimonial ? selectedNode.testimonial.replace(/\n/g, '<br>') : '';
     }

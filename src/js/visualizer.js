@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import { Node } from './node.js';
 
 class Visualizer {
+
+    // Interpolates between two THREE.Color objects (a, b) by t in [0,1]
+    interpolateColor(a, b, t) {
+        // Clamp t
+        t = Math.max(0, Math.min(1, t));
+        const r = a.r * (1 - t) + b.r * t;
+        const g = a.g * (1 - t) + b.g * t;
+        const b_ = a.b * (1 - t) + b.b * t;
+        return new THREE.Color(r, g, b_);
+    }
     getTreeLayoutCenter(layers) {
         if (!layers || layers.length === 0) return { x: 0, y: 0, z: 0 };
         const y = -((layers.length - 1) * this.config.verticalSpacing) / 2;
@@ -41,6 +51,11 @@ class Visualizer {
             glowEffect: false,
             rootNodeName: "Root", // configurable root node name
             nodePlacementInterval: 1, // configurable interval
+            color_initial: 0xFFFF00, // #FFFF00
+            color_mid: 0x80FF80, // #80FF80
+            color_final: 0x00FFFF, // #00FFFF
+            color_hover: 0xff0000, // #ff0000
+            color_line: 0x808080, // #808080
         };
         this.placedNodeCount = 0; // Track how many nodes are placed
         this.iter = 0;
@@ -59,13 +74,14 @@ class Visualizer {
         // Get all unique years for color calculation
         const allYears = [...new Set(data.map(person => person.joinDate))].sort();
 
+
         // Create node map and build tree structure
         const nodeMap = new Map();
 
         // Create nodes first and add to scene immediately
         data.forEach(person => {
             const node = new Node(person, this.config);
-            node.useCroppedImage = this.useCroppedImages; // <-- Add this line
+            node.useCroppedImage = this.useCroppedImages;
             nodeMap.set(person.name, node);
             this.nodes.push(node);
         });
@@ -73,16 +89,44 @@ class Visualizer {
         // Build tree structure and organize by layers
         const layers = this.organizeByLayers(data, nodeMap);
 
+        // --- Set node colors based on layer (holographic gradient) ---
+        // We'll interpolate: color_initial -> color_mid -> color_final
+        const layerCount = layers.length;
+        layers.forEach((layer, i) => {
+            let color;
+            if (layerCount === 1) {
+                color = new THREE.Color(this.config.color_initial);
+            } else if (i <= (layerCount - 1) / 2) {
+                // Interpolate color_initial to color_mid
+                const t = i / ((layerCount - 1) / 2);
+                const colorStart = new THREE.Color(this.config.color_initial);
+                const colorEnd = new THREE.Color(this.config.color_mid);
+                color = this.interpolateColor(colorStart, colorEnd, t);
+                console.log(`Layer ${i} color interpolation t=${t.toFixed(2)} from ${colorStart.getHexString()} to ${colorEnd.getHexString()} resulting in ${color.getHexString()}`);
+            } else {
+                // Interpolate color_mid to color_final
+                const t = (i - (layerCount - 1) / 2) / ((layerCount - 1) / 2);
+                const colorStart = new THREE.Color(this.config.color_mid);
+                const colorEnd = new THREE.Color(this.config.color_final);
+                color = this.interpolateColor(colorStart, colorEnd, t);
+                console.log(`Layer ${i} color interpolation t=${t.toFixed(2)} from ${colorStart.getHexString()} to ${colorEnd.getHexString()} resulting in ${color.getHexString()}`);
+            }
+            layer.forEach(node => {
+                node.data._layerColor = color;
+                node.config = { ...node.config, nodeColor: color.getHex() };
+            });
+        });
+
         // Initialize positions
         this.initializePositions(layers);
 
         // Create meshes for all nodes and add to scene
         for (const node of this.nodes) {
-            node.useCroppedImage = this.useCroppedImages; // <-- Add this line
+            node.useCroppedImage = this.useCroppedImages;
             const mesh = await node.createNode(allYears);
             mesh.position.copy(node.position);
             mesh.scale.set(1, 1, 1);
-            mesh.visible = !!node.isPlaced; // Only show placed nodes
+            mesh.visible = !!node.isPlaced;
             this.scene.add(mesh);
             node.mesh = mesh;
         }
@@ -350,7 +394,7 @@ class Visualizer {
         ];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         const material = new THREE.LineBasicMaterial({
-            color: 0xffffff,
+            color: this.config.color_line,
             transparent: true,
             opacity: 0.0
         });
@@ -456,7 +500,7 @@ class Visualizer {
             mesh.userData.originalColor = mesh.material.color.clone();
         }
         if (isHovered) {
-            mesh.material.color.set(0xffff00); // yellow for hover
+            mesh.material.color.set(this.config.color_hover);
         } else {
             mesh.material.color.copy(mesh.userData.originalColor);
         }
