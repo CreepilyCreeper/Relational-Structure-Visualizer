@@ -19,6 +19,7 @@ const visualizerConfig = {
     nodeSize: 0.2,
     nodeColor: 0xffffff,
     linkHighlightColor: 0xff0000, // configurable highlight color
+    centeringForce: 0.01, // configurable centering force (default 0.05)
     layerTension: -75.0,    //always do negative
     firstLayerTension: -10,
     nodeRepulsion: 50,
@@ -29,7 +30,13 @@ const visualizerConfig = {
     clamping: 100.0,            //clamping of maximum force applied
     verticalSpacing: 4.0,
     glowEffect: false,
-    rootNodeName: "Christ"
+    rootNodeName: "Christ",
+    nodePlacementInterval: 1, // configurable interval
+    color_initial: 0xFFFF00, // #FFFF00
+    color_mid: 0x80FF80, // #80FF80
+    color_final: 0x00FFFF, // #00FFFF
+    color_hover: 0xff0000, // #ff0000
+    color_line: 0x808080, // #808080
 };
 
 // Scene setup

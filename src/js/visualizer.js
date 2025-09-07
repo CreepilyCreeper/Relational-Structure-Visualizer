@@ -39,6 +39,7 @@ class Visualizer {
         this.config = {
             nodeSize: 0.5,
             nodeColor: 0xffffff,
+            centeringForce: 0.1, // configurable centering force (default 0.05)
             layerTension: 1.0,
             firstLayerTension: -1,
             nodeRepulsion: 1.0,
@@ -195,8 +196,8 @@ class Visualizer {
                         }
                     }
                     // If parent found and placed, position under parent; else, use layer Y
-                    let x = (Math.random() - 0.5) * 2;
-                    let z = (Math.random() - 0.5) * 2;
+                    let x = (Math.random() - 0.5) * 0.5;
+                    let z = (Math.random() - 0.5) * 0.5;
                     const layerIndex = this.layersForPlacement.findIndex(layer => layer.includes(nodeToPlace));
                     let y = -layerIndex * this.config.verticalSpacing;
                     let parentY = y;
@@ -217,7 +218,7 @@ class Visualizer {
             // --- Y GLIDE LOGIC ---
             this.nodes.forEach(node => {
                 if (node.isPlaced && typeof node.targetY === "number" && node.glideProgress < 1) {
-                    node.glideProgress += 1 / 20; // 20 iterations
+                    node.glideProgress += 1 / 100; // 100 iterations
                     if (node.glideProgress > 1) node.glideProgress = 1;
                     // Linear interpolation from current y to targetY
                     node.position.y = node.position.y * (1 - node.glideProgress) + node.targetY * node.glideProgress;
@@ -230,11 +231,27 @@ class Visualizer {
                 node.force = new THREE.Vector3(0, 0, 0);
             });
 
+
             // Only apply forces to placed nodes
             const placedLayers = this.layersForPlacement.map(layer => layer.filter(n => n.isPlaced));
 
             this.applyLayerTension(placedLayers);
             this.applySameLayerRepulsion(placedLayers);
+
+            // --- Centering force (applied in x and z only) ---
+            this.nodes.forEach(node => {
+                if (!node.isPlaced) return;
+                // Center is at (0, *, 0)
+                const centeringStrength = this.config.centeringForce ?? 0.05;
+                // Vector from node to center (0, *, 0)
+                const centerVec = new THREE.Vector3(-node.position.x, 0, -node.position.z);
+                // Only apply in x and z
+                centerVec.y = 0;
+                // Apply centering force
+                //console.log(`Before Force: (${node.force.x.toFixed(2)}, ${node.force.y.toFixed(2)}, ${node.force.z.toFixed(2)})`);
+                node.force.add(centerVec.multiplyScalar(centeringStrength));
+                //console.log(`After Force: (${node.force.x.toFixed(2)}, ${node.force.y.toFixed(2)}, ${node.force.z.toFixed(2)})`);
+            });
 
             // Update positions
             this.nodes.forEach(node => {
