@@ -1,59 +1,69 @@
-# Relational-Structure-Visualizer 
 
-## Overview
-Relational-Structure-Visualizer is a 3D interactive tool designed to represent members of a community as nodes in a tree structure. Each node corresponds to a person in the community, displaying their selfie and information about their joining date and connections to other members.
+# Relational Structure Visualizer
 
-## Features
-- **3D Visualization**: Render community members in a 3D space using WebGL.
-- **Interactive Nodes**: Clickable nodes that display additional information about each member.
-- **Dynamic Data Loading**: Fetch community data from a JSON file to populate the visualizer.
+## Introduction
 
-## Links
-- Data Input: https://docs.google.com/spreadsheets/d/1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA/
-- Main Site: https://creepilycreeper.github.io/USTCCC-Relational-Structure-Visualizer/
+**Relational Structure Visualizer** is an interactive 3D web application for visualizing community structures as hierarchical trees. Each node represents a community member, displaying their selfie, joining date, and relationships to others. The tool is designed for intuitive exploration and analysis of social or organizational networks.
 
-## Project Structure 
+## Key Features
+
+- **3D Visualization**: Explore community members and their relationships in a dynamic 3D environment powered by WebGL.
+- **Interactive Nodes**: Click on nodes to reveal detailed information, including member photos and connection data.
+- **Dynamic Data Loading**: Community data is loaded from JSON or TSV/CSV files, allowing for easy updates and customization.
+- **Custom Textures**: Each node can display a unique selfie or fallback image for a personalized experience.
+
+## Project Structure
+
 ```
-community-visualizer
-├── src
-│   ├── index.html          # Main HTML document
-│   ├── css
-│   │   └── styles.css      # Styles for the visualizer
-│   ├── js
-│   │   ├── main.js         # Initializes the visualizer
-│   │   ├── visualizer.js    # Logic for rendering the 3D tree
-│   │   ├── database.js      # Handles data fetching
-│   │   └── node.js         # Defines the Node class
-│   ├── data
-│   │   └── community.json   # Community data in JSON format
-│   └── assets
-│       └── textures        # Textures for node representations
-├── package.json            # npm configuration file
-├── webpack.config.js       # Webpack configuration file
-└── README.md               # Project documentation
+Relational-Structure-Visualizer/
+├── src/
+│   ├── index.html           # Main HTML entry point
+│   ├── css/
+│   │   └── styles.css       # Application styles
+│   ├── js/
+│   │   ├── main.js          # App initialization
+│   │   ├── visualizer.js    # 3D rendering logic
+│   │   ├── database.js      # Data loading and parsing
+│   │   └── node.js          # Node class definition
+│   ├── data/
+│   │   ├── community-sheet.csv
+│   │   ├── community-sheet.tsv
+│   │   ├── community-sheet2.tsv
+│   │   ├── test_data_community.json
+│   │   └── generate-community.js
+│   └── assets/
+│       ├── textures/        # Node textures
+│       └── selfies/         # Member selfies
+├── package.json             # Project metadata & dependencies
+├── webpack.config.js        # Webpack build configuration
+├── temp.json                # Temporary/generated data
+└── README.md                # Project documentation
 ```
 
-## Setup Instructions
-1. Clone the repository:
+## Getting Started
+
+1. **Clone the repository:**
+   ```sh
+   git clone https://github.com/yourusername/Relational-Structure-Visualizer.git
+   cd Relational-Structure-Visualizer
    ```
-   git clone https://github.com/yourusername/community-visualizer.git
-   ```
-2. Navigate to the project directory:
-   ```
-   cd community-visualizer
-   ```
-3. Install dependencies:
-   ```
+2. **Install dependencies:**
+   ```sh
    npm install
    ```
-4. Build the project:
-   ```
+3. **Build the project:**
+   ```sh
    npm run build
    ```
-5. Serve the project locally:
-   ```
+4. **Start a local server:**
+   ```sh
    npm start
    ```
+5. **Open the app:**
+   Open `src/index.html` in your browser, or visit the local server URL provided in the terminal.
 
 ## Usage
-Open `src/index.html` in your web browser to view the visualizer. Interact with the nodes to explore the community structure.
+
+- Click on nodes to view member details and connections.
+- Use mouse controls to rotate, zoom, and pan the 3D view.
+- Update or replace data files in `src/data/` to visualize different communities.
