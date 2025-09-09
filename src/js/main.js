@@ -120,6 +120,12 @@ function getMouseWorldPositionAtY(mouse, camera, y) {
     return intersection;
 }
 
+function displayNodeData(node) {
+    document.getElementById('node-name').innerHTML = `${node.name || ''} (${node.joinDate || ''})`;
+    document.getElementById('node-image').src = node.selfie || '';
+    document.getElementById('node-details').innerHTML = node.testimonial ? node.testimonial.replace(/\n/g, '<br>') : '';
+}
+
 renderer.domElement.addEventListener('mousedown', (event) => {
     mouseDown = true;
     mouseX = event.clientX;
@@ -194,9 +200,7 @@ renderer.domElement.addEventListener('click', (event) => {
         visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
 
         // --- Show side menu with node data ---
-        document.getElementById('node-name').innerHTML = `${selectedNode.name || ''} (${selectedNode.joinDate || ''})`;
-        document.getElementById('node-image').src = selectedNode.selfie || '';
-        document.getElementById('node-details').innerHTML = selectedNode.testimonial ? selectedNode.testimonial.replace(/\n/g, '<br>') : '';
+        displayNodeData(selectedNode);
     }
 });
 
@@ -325,9 +329,7 @@ renderer.domElement.addEventListener('touchstart', (event) => {
             cameraConfig.center = selectedNode.position;
             updateCameraPosition();
             visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
-            document.getElementById('node-name').innerHTML = selectedNode.name || '';
-            document.getElementById('node-image').src = selectedNode.selfie || '';
-            document.getElementById('node-details').innerHTML = selectedNode.testimonial ? selectedNode.testimonial.replace(/\n/g, '<br>') : '';
+            displayNodeData(selectedNode);
         }
     }
 }, { passive: false });
@@ -419,9 +421,7 @@ function selectNodeFromSearch(member) {
         cameraConfig.center = selectedNode.position;
         updateCameraPosition();
         visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
-        document.getElementById('node-name').innerHTML = selectedNode.name || '';
-        document.getElementById('node-image').src = selectedNode.selfie || '';
-        document.getElementById('node-details').innerHTML = selectedNode.testimonial ? selectedNode.testimonial.replace(/\n/g, '<br>') : '';
+        displayNodeData(selectedNode);
     }
 }
 

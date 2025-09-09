@@ -79,7 +79,7 @@ const fetchData = async (useTestData = false) => {
             //console.log(`Processing member: ${name}`);
             const selfiePath = await findSelfiePath(name);
             //console.log(`Selfie path for ${name}: ${selfiePath}`);
-            console.log(`Selfie cropped path for ${name}: ${getSelfieCroppedPath(selfiePath, name)}`);
+            //console.log(`Selfie cropped path for ${name}: ${getSelfieCroppedPath(selfiePath, name)}`);
 
             return {
                 name: name,
@@ -96,7 +96,7 @@ const fetchData = async (useTestData = false) => {
             const communityData = { members };
             // Store in localStorage (static sites can't write to files)
             localStorage.setItem('communityData', JSON.stringify(communityData));
-            console.log(JSON.stringify(communityData, null, 2));
+            //console.log(JSON.stringify(communityData, null, 2));
             return communityData;
         } catch (error) {
             console.error('Error fetching Google Sheets data:', error);

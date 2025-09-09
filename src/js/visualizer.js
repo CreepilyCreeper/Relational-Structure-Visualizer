@@ -103,14 +103,14 @@ class Visualizer {
                 const colorStart = new THREE.Color(this.config.color_initial);
                 const colorEnd = new THREE.Color(this.config.color_mid);
                 color = this.interpolateColor(colorStart, colorEnd, t);
-                console.log(`Layer ${i} color interpolation t=${t.toFixed(2)} from ${colorStart.getHexString()} to ${colorEnd.getHexString()} resulting in ${color.getHexString()}`);
+                //console.log(`Layer ${i} color interpolation t=${t.toFixed(2)} from ${colorStart.getHexString()} to ${colorEnd.getHexString()} resulting in ${color.getHexString()}`);
             } else {
                 // Interpolate color_mid to color_final
                 const t = (i - (layerCount - 1) / 2) / ((layerCount - 1) / 2);
                 const colorStart = new THREE.Color(this.config.color_mid);
                 const colorEnd = new THREE.Color(this.config.color_final);
                 color = this.interpolateColor(colorStart, colorEnd, t);
-                console.log(`Layer ${i} color interpolation t=${t.toFixed(2)} from ${colorStart.getHexString()} to ${colorEnd.getHexString()} resulting in ${color.getHexString()}`);
+                //console.log(`Layer ${i} color interpolation t=${t.toFixed(2)} from ${colorStart.getHexString()} to ${colorEnd.getHexString()} resulting in ${color.getHexString()}`);
             }
             layer.forEach(node => {
                 node.data._layerColor = color;

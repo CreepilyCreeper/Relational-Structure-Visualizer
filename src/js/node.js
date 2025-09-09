@@ -17,7 +17,7 @@ class Node {
     }
 
     async createNode(allYears = null) {
-        console.log(`Creating node for ${this.data.name}, selfie path: ${this.data.selfie}`);
+        //console.log(`Creating node for ${this.data.name}, selfie path: ${this.data.selfie}`);
         
         const geometry = new THREE.SphereGeometry(this.originalScale, 32, 32);
         const color = new THREE.Color(this.config.nodeColor);
@@ -54,8 +54,8 @@ class Node {
         // --- Add Sprite for Cropped Image with fallback ---
         if (this.data.selfiecropped && this.data.name) {
             // 1. Use a fallback texture first (solid color or default image)
-            const fallbackTexture = new THREE.TextureLoader().load('./assets/selfies/fallback.png'); // or use a solid color canvas
-            const spriteMaterial = new THREE.SpriteMaterial({depthTest: false });
+            const fallbackTexture = new THREE.TextureLoader().load('./assets/selfiescropped/fallback_CROPPED.jpg');
+            const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
             this.sprite = new THREE.Sprite(spriteMaterial);
             this.sprite.renderOrder = 999;
             // Start hidden if not in cropped mode
@@ -83,7 +83,9 @@ class Node {
                     this.sprite.material.needsUpdate = true;
                 })
                 .catch(() => {
-                    // Optionally handle error (keep fallback)
+                    // If loading fails, fallbackTexture remains in use
+                    this.sprite.material.map = fallbackTexture;
+                    this.sprite.material.needsUpdate = true;
                 });
         }
         
