@@ -177,8 +177,31 @@ class Visualizer {
         this.isAnimating = true;
         const damping = this.config.damping;
 
+        // --- FPS Meter ---
+        console.log("Enter toggleFPS() in console to toggle FPS meter");
+        if (typeof window.__showFPS === "undefined") window.__showFPS = false;
+        window.toggleFPS = function () {
+            window.__showFPS = !window.__showFPS;
+            console.log("FPS meter " + (window.__showFPS ? "enabled" : "disabled"));
+        };
+
+        let lastFpsTime = performance.now();
+        let frameCount = 0;
+
         const animateIteration = () => {
             if (!this.isAnimating) return;
+
+            // --- FPS Meter logic ---
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsTime >= 1000) {
+                const fps = frameCount / ((now - lastFpsTime) / 1000);
+                if (window.__showFPS) {
+                    console.log(`FPS: ${fps.toFixed(1)}`);
+                }
+                frameCount = 0;
+                lastFpsTime = now;
+            }
 
             // Place a new node every N iterations
             if (
