@@ -304,8 +304,8 @@ class Visualizer {
             currentLayer.forEach(parentNode => {
                 const person = this.nodes.find(n => n === parentNode)?.data;
                 if (person && person.referrals) {
-                    person.referrals.forEach(referralName => {
-                        const childNode = nextLayer.find(n => n.data.uniqueKey === referralName);
+                    person.referrals.forEach(referralKey => {
+                        const childNode = nextLayer.find(n => n.data.uniqueKey === referralKey);
                         if (childNode) {
                             const direction = new THREE.Vector3()
                                 .subVectors(childNode.position, parentNode.position);
