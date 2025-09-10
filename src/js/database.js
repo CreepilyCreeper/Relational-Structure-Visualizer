@@ -1,6 +1,6 @@
 // Replace with your sheet's ID and sheet name
 const sheetId = '1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA';
-const sheetName = 'Main Data';
+const sheetName = 'Test(1) Data';  //use Main Data for real data, Test(1/2) Data for testing
 const url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
 const selfieDir = './assets/selfies/';
 const fallbackSelfie = 'fallback.png';
@@ -133,6 +133,27 @@ const fetchData = async (useTestData = false) => {
                 }
                 member.referrals = resolvedReferrals;
                 delete member._rawReferrals;
+            }
+
+            // Special logic: nodes with joinDate === '0' link to all nodes without parent nodes
+            // 1. Build a set of all uniqueKeys that are referred to by any node
+            const referredSet = new Set();
+            for (const member of members) {
+                if (Array.isArray(member.referrals)) {
+                    for (const ref of member.referrals) {
+                        referredSet.add(ref);
+                    }
+                }
+            }
+            // 2. Find all nodes that are not referred to by anyone (orphans)
+            const orphanNodes = members.filter(m => !referredSet.has(m.uniqueKey));
+            // 3. For each node with joinDate === '0', set its referrals to all orphan nodes (by uniqueKey)
+            for (const member of members) {
+                if (member.joinDate === '0') {
+                    member.referrals = orphanNodes
+                        .filter(o => o.uniqueKey !== member.uniqueKey) // avoid self-link
+                        .map(o => o.uniqueKey);
+                }
             }
 
             const communityData = { members };
