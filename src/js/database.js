@@ -1,6 +1,6 @@
 // Replace with your sheet's ID and sheet name
 const sheetId = '1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA';
-const sheetName = 'Sheet1';
+const sheetName = 'Main Data';
 const url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
 const selfieDir = './assets/selfies/';
 const fallbackSelfie = 'fallback.png';
@@ -66,37 +66,78 @@ const fetchData = async (useTestData = false) => {
         try {
             const response = await fetch(url);
             if (!response.ok) {
-            throw new Error('Network response was not ok');
+                throw new Error('Network response was not ok');
             }
             const rows = await response.json();
 
             // Filter out rows with no name
             const filteredRows = rows.filter(row => row.name && row.name.trim());
 
-            // For each member, resolve the selfie path asynchronously
+            // First, create all members with uniqueKey, but don't process referrals yet
             const members = await Promise.all(filteredRows.map(async row => {
-            const name = row.name.trim();
-            //console.log(`Processing member: ${name}`);
-            const selfiePath = await findSelfiePath(name);
-            //console.log(`Selfie path for ${name}: ${selfiePath}`);
-            //console.log(`Selfie cropped path for ${name}: ${getSelfieCroppedPath(selfiePath, name)}`);
-
-            return {
-                name: name,
-                selfie: selfiePath,
-                selfiecropped: getSelfieCroppedPath(selfiePath, name),
-                joinDate: row.joinDate,
-                referrals: row.referrals
-                ? row.referrals.split(',').map(s => s.trim()).filter(Boolean)
-                : [],
-                testimonial: row.testimonial
-            };
+                const name = row.name.trim();
+                const joinDate = row.joinDate ? row.joinDate.trim() : '';
+                const uniqueKey = `${name}__${joinDate}`;
+                const selfiePath = await findSelfiePath(name);
+                return {
+                    name: name,
+                    selfie: selfiePath,
+                    selfiecropped: getSelfieCroppedPath(selfiePath, name),
+                    joinDate: joinDate,
+                    uniqueKey: uniqueKey,
+                    // Store original referrals string for now
+                    _rawReferrals: row.referrals,
+                    testimonial: row.testimonial
+                };
             }));
+
+            // Build a lookup: name -> array of member objects sorted by joinDate ascending
+            const nameToMembers = {};
+            for (const member of members) {
+                if (!nameToMembers[member.name]) nameToMembers[member.name] = [];
+                nameToMembers[member.name].push(member);
+            }
+            for (const arr of Object.values(nameToMembers)) {
+                arr.sort((a, b) => {
+                    // Compare joinDate as string (ISO or YYYY-MM-DD preferred)
+                    if (a.joinDate < b.joinDate) return -1;
+                    if (a.joinDate > b.joinDate) return 1;
+                    return 0;
+                });
+            }
+
+            // Now process referrals for each member
+            for (const member of members) {
+                const parentJoinDate = member.joinDate;
+                const rawReferrals = member._rawReferrals;
+                let referralNames = [];
+                if (rawReferrals) {
+                    referralNames = rawReferrals.split(',').map(s => s.trim()).filter(Boolean);
+                }
+                // Count occurrences of each referral name in the list
+                const nameCounts = {};
+                for (const refName of referralNames) {
+                    nameCounts[refName] = (nameCounts[refName] || 0) + 1;
+                }
+                // For each referral name, find the correct referred nodes
+                const resolvedReferrals = [];
+                for (const [refName, count] of Object.entries(nameCounts)) {
+                    const candidates = (nameToMembers[refName] || []).filter(m => m.joinDate > parentJoinDate);
+                    // Sort by joinDate ascending (already sorted, but filter may change order)
+                    for (let i = 0; i < count; i++) {
+                        if (candidates[i]) {
+                            resolvedReferrals.push(candidates[i].uniqueKey);
+                        }
+                        // If not enough candidates, skip
+                    }
+                }
+                member.referrals = resolvedReferrals;
+                delete member._rawReferrals;
+            }
 
             const communityData = { members };
             // Store in localStorage (static sites can't write to files)
             localStorage.setItem('communityData', JSON.stringify(communityData));
-            //console.log(JSON.stringify(communityData, null, 2));
             return communityData;
         } catch (error) {
             console.error('Error fetching Google Sheets data:', error);

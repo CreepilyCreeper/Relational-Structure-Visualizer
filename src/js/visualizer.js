@@ -83,7 +83,7 @@ class Visualizer {
         data.forEach(person => {
             const node = new Node(person, this.config);
             node.useCroppedImage = this.useCroppedImages;
-            nodeMap.set(person.name, node);
+            nodeMap.set(person.uniqueKey, node);
             this.nodes.push(node);
         });
 
@@ -167,7 +167,7 @@ class Visualizer {
         const layers = joinDates.map(date => {
             return data
                 .filter(person => person.joinDate === date)
-                .map(person => nodeMap.get(person.name))
+                .map(person => nodeMap.get(person.uniqueKey))
                 .filter(node => node);
         });
         return layers;
@@ -190,7 +190,7 @@ class Visualizer {
                     // Find parent node (the one that referred to this node)
                     let parentNode = null;
                     for (const node of this.nodes) {
-                        if (node.data.referrals && node.data.referrals.includes(nodeToPlace.data.name)) {
+                        if (node.data.referrals && node.data.referrals.includes(nodeToPlace.data.uniqueKey)) {
                             parentNode = node;
                             break;
                         }
@@ -305,7 +305,7 @@ class Visualizer {
                 const person = this.nodes.find(n => n === parentNode)?.data;
                 if (person && person.referrals) {
                     person.referrals.forEach(referralName => {
-                        const childNode = nextLayer.find(n => n.data.name === referralName);
+                        const childNode = nextLayer.find(n => n.data.uniqueKey === referralName);
                         if (childNode) {
                             const direction = new THREE.Vector3()
                                 .subVectors(childNode.position, parentNode.position);
@@ -352,9 +352,9 @@ class Visualizer {
 
                     // --- Use sameParentRepulsion if nodes share a parent ---
                     let repulsionForceValue = this.config.nodeRepulsion;
-                    // Find if nodeA and nodeB share a parent
-                    const parentsA = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(nodeA.data.name));
-                    const parentsB = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(nodeB.data.name));
+                    // Find if nodeA and nodeB share a parent (using uniqueKey only)
+                    const parentsA = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(nodeA.data.uniqueKey));
+                    const parentsB = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(nodeB.data.uniqueKey));
                     const sharedParent = parentsA.find(parent => parentsB.includes(parent));
 
                     // Hooke's law for nodes with shared parent
@@ -391,9 +391,9 @@ class Visualizer {
         const promises = [];
         data.forEach(person => {
             if (person.referrals && person.referrals.length > 0) {
-                const parentNode = nodeMap.get(person.name);
-                person.referrals.forEach(referralName => {
-                    const childNode = nodeMap.get(referralName);
+                const parentNode = nodeMap.get(person.uniqueKey);
+                person.referrals.forEach(referralKey => {
+                    const childNode = nodeMap.get(referralKey);
                     if (childNode) {
                         promises.push(this.animateConnection(parentNode, childNode));
                     }
@@ -459,7 +459,7 @@ class Visualizer {
     }
 
     updateNode(person) {
-        const node = this.nodes.find(n => n.data.name === person.name);
+        const node = this.nodes.find(n => n.data.uniqueKey === person.uniqueKey);
         if (node) {
             node.update(person);
         }
@@ -538,8 +538,8 @@ class Visualizer {
         // Highlight outgoing and incoming links
         this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
             if (
-                (parentNode.data.name === nodeData.name) || // outgoing
-                (childNode.data.name === nodeData.name)     // incoming
+                (parentNode.data.uniqueKey === nodeData.uniqueKey) || // outgoing
+                (childNode.data.uniqueKey === nodeData.uniqueKey)     // incoming
             ) {
                 line.material.color.set(color);
             }
@@ -555,7 +555,7 @@ class Visualizer {
             parents.forEach(parent => {
                 this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
                     if (
-                        childNode.data.name === parent.data.name
+                        childNode.data.uniqueKey === parent.data.uniqueKey
                     ) {
                         line.material.color.set(color);
                     }

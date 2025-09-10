@@ -43,6 +43,7 @@ class Node {
         
         // Add user data for interactions
         this.mesh.userData = {
+            uniqueKey: this.data.uniqueKey,
             name: this.data.name,
             joinDate: this.data.joinDate,
             referrals: this.data.referrals || [],
@@ -52,7 +53,7 @@ class Node {
         };
         
         // --- Add Sprite for Cropped Image with fallback ---
-        if (this.data.selfiecropped && this.data.name) {
+        if (this.data.selfiecropped && this.data.uniqueKey) {
             // 1. Use a fallback texture first (solid color or default image)
             const fallbackTexture = new THREE.TextureLoader().load('./assets/selfiescropped/fallback_CROPPED.jpg');
             const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
@@ -107,6 +108,7 @@ class Node {
         this.data = newData;
         if (this.mesh) {
             this.mesh.userData = {
+                uniqueKey: this.data.uniqueKey,
                 name: this.data.name,
                 joinDate: this.data.joinDate,
                 referrals: this.data.referrals || [],
