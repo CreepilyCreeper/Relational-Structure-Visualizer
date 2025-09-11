@@ -5,7 +5,7 @@ import mimetypes
 import json
 import shutil
 
-SHEET_URL = "https://opensheet.elk.sh/1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA/Sheet1"
+SHEET_URL = "https://opensheet.elk.sh/1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA/Main%20Data"
 SELFIE_DIR = "src/assets/selfies"
 WORKFLOWS_DIR = os.path.dirname(__file__)
 DOWNLOADED_IMAGES = os.path.join(WORKFLOWS_DIR, "downloaded_images.json")
