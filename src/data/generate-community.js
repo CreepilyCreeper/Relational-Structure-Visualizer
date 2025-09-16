@@ -1,12 +1,12 @@
 // Configurable options
 const config = {
-  layers: 8,
-  minNodes: 10,
+  layers: 12,
+  minNodes: 15,
   maxNodes: 30,
   minYear: 2016,
-  minReferrals: 1,
+  minReferrals: 0,
   maxReferrals: 5,
-  maxReferralLayerOffset: 3, // how many layers ahead a node can refer to
+  maxReferralLayerOffset: 3, // how many layers ahead a node can be a parent
 };
 
 const fs = require('fs');
@@ -29,65 +29,115 @@ for (let l = 1; l <= config.layers; l++) {
 
 // --- Add root node ---
 const rootNode = {
-  name: "Root",
-  selfie: "assets/selfies/root.png",
+  name: "Christ",
+  selfie: "assets/selfies/Christ.jpg",
   joinDate: (config.minYear - 1).toString(),
-  referrals: [...nodeNames[1]], // refer to all first layer nodes
+  parent: "", // Root has no parent
+  linktype: "",
 };
 members.push(rootNode);
 
-// Track which nodes have already been referred
-const referredNodes = {};
-// Mark all first layer nodes as referred by root
-for (const node of nodeNames[1]) {
-  referredNodes[node] = true;
+// Prepare parent assignment tracking
+const parentChildCounts = {}; // key: node name, value: number of children
+
+// Initialize parentChildCounts for all nodes (including root)
+parentChildCounts[rootNode.name] = 0;
+for (let l = 1; l <= config.layers; l++) {
+  for (const name of nodeNames[l]) {
+    parentChildCounts[name] = 0;
+  }
 }
 
+// For each node (except root), assign a parent
+const nodeObjects = {}; // name -> node object for easy lookup
 for (let l = 1; l <= config.layers; l++) {
   for (let n = 0; n < nodeNames[l].length; n++) {
     const name = nodeNames[l][n];
     const selfie = `assets/selfies/layer${l}-node${n+1}.png`;
     const joinDate = (config.minYear + l - 1).toString();
-    let referrals = [];
-    // Randomly decide how many referrals this node will make (minReferrals-maxReferrals)
-    const numReferrals = getRandomInt(config.minReferrals, config.maxReferrals);
-    let totalAdded = 0;
-    // Try to refer to up to numReferrals nodes in up to maxReferralLayerOffset layers ahead
-    for (let offset = 1; offset <= config.maxReferralLayerOffset && totalAdded < numReferrals; offset++) {
-      const targetLayer = l + offset;
-      if (targetLayer > config.layers) continue;
-      // Get all available candidates in this layer
-      const candidates = nodeNames[targetLayer]
-        .map((node, idx) => ({ node, idx }))
-        .filter(({ node }) => !referredNodes[node]);
-      // Shuffle candidates for randomness
-      for (let i = candidates.length - 1; i > 0; i--) {
-        const j = getRandomInt(0, i);
-        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-      }
-      for (let c = 0; c < candidates.length && totalAdded < numReferrals; c++) {
-        referrals.push(candidates[c].node);
-        referredNodes[candidates[c].node] = true;
-        totalAdded++;
+
+    // Find all eligible parents in previous layers within offset
+    let eligibleParents = [];
+    for (let offset = 1; offset <= config.maxReferralLayerOffset; offset++) {
+      const parentLayer = l - offset;
+      if (parentLayer < 0) break;
+      if (parentLayer === 0) {
+        eligibleParents.push(rootNode.name);
+      } else if (nodeNames[parentLayer]) {
+        eligibleParents = eligibleParents.concat(nodeNames[parentLayer]);
       }
     }
-    members.push({ name, selfie, joinDate, referrals });
+
+    // Filter parents that have not exceeded maxReferrals
+    eligibleParents = eligibleParents.filter(parentName =>
+      parentChildCounts[parentName] < config.maxReferrals
+    );
+
+    // If no eligible parent, assign root as parent
+    let parent = "";
+    if (eligibleParents.length > 0) {
+      parent = eligibleParents[getRandomInt(0, eligibleParents.length - 1)];
+      parentChildCounts[parent]++;
+    } else {
+      parent = rootNode.name;
+      parentChildCounts[rootNode.name]++;
+    }
+
+    const linktype = "referral";
+    const node = { name, selfie, joinDate, parent, linktype };
+    members.push(node);
+    nodeObjects[name] = node;
   }
 }
 
-fs.writeFileSync('test_data_community2.json', JSON.stringify({ members }, null, 2));
+// Now, ensure that each parent has at least minReferrals children (except root)
+for (let l = 1; l <= config.layers; l++) {
+  for (const parentName of nodeNames[l]) {
+    if (parentChildCounts[parentName] < config.minReferrals) {
+      // Find nodes that could be reassigned to this parent
+      // Only nodes in later layers (within offset) are eligible
+      for (let offset = 1; offset <= config.maxReferralLayerOffset; offset++) {
+        const childLayer = l + offset;
+        if (childLayer > config.layers) continue;
+        for (const childName of nodeNames[childLayer]) {
+          const child = nodeObjects[childName];
+          if (!child) continue;
+          // Check if child's current parent is not this parent, and this parent is eligible
+          if (
+            child.parent !== parentName &&
+            parentChildCounts[parentName] < config.maxReferrals
+          ) {
+            // Decrement old parent's count
+            if (parentChildCounts[child.parent] !== undefined) {
+              parentChildCounts[child.parent]--;
+            }
+            child.parent = parentName;
+            child.linktype = "referral";
+            parentChildCounts[parentName]++;
+            // Stop if minReferrals reached
+            if (parentChildCounts[parentName] >= config.minReferrals) break;
+          }
+        }
+        if (parentChildCounts[parentName] >= config.minReferrals) break;
+      }
+    }
+  }
+}
+
+// Write JSON
+fs.writeFileSync('test_data_community.json', JSON.stringify({ members }, null, 2));
 
 // Generate TSV for Google Sheets
 const tsvRows = [
-  'name	selfie	joinDate	referrals',
+  'name	selfie	joinDate	parent	linktype',
   ...members.map(m => {
-    // No need to escape quotes for TSV, just join with tabs
     const name = m.name;
     const selfie = '';
     const joinDate = m.joinDate;
-    const referrals = m.referrals.join(', ');
-    return [name, selfie, joinDate, referrals].join('\t');
+    const parent = m.parent || '';
+    const linktype = m.linktype || '';
+    return [name, selfie, joinDate, parent, linktype].join('\t');
   })
 ];
-fs.writeFileSync('test_data_community-sheet2.tsv', tsvRows.join('\n'));
-console.log('Generated test_data_community2.json and test_data_community-sheet2.tsv with', members.length, 'members.');
+fs.writeFileSync('test_data_community-sheet.tsv', tsvRows.join('\n'));
+console.log('Generated test_data_community.json and test_data_community-sheet.tsv');

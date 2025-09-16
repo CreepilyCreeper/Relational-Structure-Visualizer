@@ -210,29 +210,33 @@ class Visualizer {
             ) {
                 const nodeToPlace = this.allNodesFlat[this.placedNodeCount];
                 if (nodeToPlace && !nodeToPlace.isPlaced) {
-                    // Find parent node (the one that referred to this node)
+                    // Find parent node using parent property
                     let parentNode = null;
-                    for (const node of this.nodes) {
-                        if (node.data.referrals && node.data.referrals.includes(nodeToPlace.data.uniqueKey)) {
-                            parentNode = node;
-                            break;
-                        }
+                    if (nodeToPlace.data.parent) {
+                        parentNode = this.nodes.find(n => n.data.uniqueKey === nodeToPlace.data.parent);
                     }
-                    // If parent found and placed, position under parent; else, use layer Y
-                    let x = (Math.random() - 0.5) * 0.5;
-                    let z = (Math.random() - 0.5) * 0.5;
+                    // If parent found and placed, position at parent; else, use layer Y
+                    let x = 0, z = 0;
                     const layerIndex = this.layersForPlacement.findIndex(layer => layer.includes(nodeToPlace));
                     let y = -layerIndex * this.config.verticalSpacing;
                     let parentY = y;
                     if (parentNode && parentNode.isPlaced) {
-                        x += parentNode.position.x;
-                        z += parentNode.position.z;
+                        x = parentNode.position.x;
+                        z = parentNode.position.z;
                         parentY = parentNode.position.y;
                     }
-                    nodeToPlace.position.set(x, parentY, z); // Start at parent's Y
+                    nodeToPlace.position.set(x, parentY, z); // Start at parent's position
                     nodeToPlace.targetY = y; // Glide to this Y
                     nodeToPlace.glideProgress = 0; // 0 to 1 over 20 frames
                     nodeToPlace.isPlaced = true;
+                    // Assign a small random initial velocity to nudge the node
+                    const angle = Math.random() * 2 * Math.PI;
+                    const speed = 1; // Small random speed
+                    nodeToPlace.velocity = new THREE.Vector3(
+                        Math.cos(angle) * speed,
+                        0,
+                        Math.sin(angle) * speed
+                    );
                     this.placedNodeCount++;
                     if (nodeToPlace.mesh) nodeToPlace.mesh.visible = true;
                 }
@@ -321,36 +325,30 @@ class Visualizer {
     }
 
     applyLayerTension(layers) {
-        for (let layerIndex = 0; layerIndex < layers.length - 1; layerIndex++) {
-            const currentLayer = layers[layerIndex];
-            const nextLayer = layers[layerIndex + 1];
-            currentLayer.forEach(parentNode => {
-                const person = this.nodes.find(n => n === parentNode)?.data;
-                if (person && person.referrals) {
-                    person.referrals.forEach(referralKey => {
-                        const childNode = nextLayer.find(n => n.data.uniqueKey === referralKey);
-                        if (childNode) {
-                            const direction = new THREE.Vector3()
-                                .subVectors(childNode.position, parentNode.position);
-                            direction.y = 0;
-                            const distance = direction.length();
-                            if (distance > 0) {
-                                direction.normalize();
-                                // Use firstLayerTension if parentNode is root, otherwise use layerTension
-                                const tension = parentNode.data.name === this.config.rootNodeName
-                                    ? this.config.firstLayerTension
-                                    : this.config.layerTension;
-                                const force = direction.multiplyScalar(
-                                    tension * distance * 0.1
-                                );
-                                parentNode.force.sub(force);
-                                childNode.force.add(force);
-                            }
-                        }
-                    });
-                }
-            });
-        }
+        // Flatten all placed nodes for easy lookup
+        const allNodes = layers.flat();
+        allNodes.forEach(childNode => {
+            if (!childNode.isPlaced) return;
+            const parentKey = childNode.data.parent;
+            if (!parentKey) return;
+            const parentNode = allNodes.find(n => n.data.uniqueKey === parentKey && n.isPlaced);
+            if (!parentNode) return;
+
+            // Calculate direction from parent to child (XZ plane)
+            const direction = new THREE.Vector3().subVectors(childNode.position, parentNode.position);
+            direction.y = 0;
+            const distance = direction.length();
+            if (distance > 0) {
+                direction.normalize();
+                // Use firstLayerTension if parentNode is root, otherwise use layerTension
+                const tension = parentNode.data.name === this.config.rootNodeName
+                    ? this.config.firstLayerTension
+                    : this.config.layerTension;
+                const force = direction.multiplyScalar(tension * distance * 0.1);
+                parentNode.force.sub(force);
+                childNode.force.add(force);
+            }
+        });
     }
 
     applySameLayerRepulsion(layers) {
@@ -376,12 +374,21 @@ class Visualizer {
                     // --- Use sameParentRepulsion if nodes share a parent ---
                     let repulsionForceValue = this.config.nodeRepulsion;
                     // Find if nodeA and nodeB share a parent (using uniqueKey only)
-                    const parentsA = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(nodeA.data.uniqueKey));
-                    const parentsB = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(nodeB.data.uniqueKey));
-                    const sharedParent = parentsA.find(parent => parentsB.includes(parent));
+                    const parentA = nodeA.data.parent;
+                    const parentB = nodeB.data.parent;
+                    const sharedParent = parentA && parentB && parentA === parentB && parentA !== null;
 
                     // Hooke's law for nodes with shared parent
-                    if (sharedParent && parentsA[0].data.name !== this.config.rootNodeName) {
+                    // Prioritize being in first layer over sharedParent
+                    const parentNodeA = this.nodes.find(n => n.data.uniqueKey === parentA);
+                    if (parentNodeA && parentNodeA.data.name === this.config.rootNodeName) {
+                        // First layer repulsion takes priority
+                        repulsionForceValue = this.config.firstLayerRepulsion;
+                        const repulsionForce = repulsionForceValue / (distance * distance);
+                        const force = direction.multiplyScalar(repulsionForce);
+                        nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                        nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                    } else if (sharedParent && parentA !== null && parentA !== undefined) {
                         // Configurable spring length and constant
                         const springLength = this.config.sameParentSpringLength ?? 2.0; // default 2.0 units
                         const k = this.config.sameParentRepulsion; // spring constant
@@ -393,9 +400,6 @@ class Visualizer {
                         nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
                     } else {
                         // Default repulsion
-                        if (parentsA[0] && parentsA[0].data.name === this.config.rootNodeName) {
-                            repulsionForceValue = this.config.firstLayerRepulsion;
-                        }
                         const repulsionForce = repulsionForceValue / (distance * distance);
                         const force = direction.multiplyScalar(repulsionForce);
                         nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
@@ -413,14 +417,12 @@ class Visualizer {
         this.animatedConnections = [];
         const promises = [];
         data.forEach(person => {
-            if (person.referrals && person.referrals.length > 0) {
-                const parentNode = nodeMap.get(person.uniqueKey);
-                person.referrals.forEach(referralKey => {
-                    const childNode = nodeMap.get(referralKey);
-                    if (childNode) {
-                        promises.push(this.animateConnection(parentNode, childNode));
-                    }
-                });
+            if (person.parent) {
+                const parentNode = nodeMap.get(person.parent);
+                const childNode = nodeMap.get(person.uniqueKey);
+                if (parentNode && childNode) {
+                    promises.push(this.animateConnection(parentNode, childNode));
+                }
             }
         });
         await Promise.all(promises);
@@ -571,21 +573,20 @@ class Visualizer {
         // --- Highlight all ancestor links up to the root ---
         let currentNode = nodeData;
         while (true) {
-            // Find parent(s) of the current node
-            const parents = this.nodes.filter(n => n.data.referrals && n.data.referrals.includes(currentNode.name));
-            if (parents.length === 0) break; // No more parents, stop
-            // For each parent, highlight the link from its parent to it
-            parents.forEach(parent => {
-                this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
-                    if (
-                        childNode.data.uniqueKey === parent.data.uniqueKey
-                    ) {
-                        line.material.color.set(color);
-                    }
-                });
-                // Continue up the chain with this parent
-                currentNode = parent.data;
+            // Find parent of the current node
+            const parent = this.nodes.find(n => n.data.uniqueKey === currentNode.parent);
+            if (!parent) break; // No more parents, stop
+            // Highlight the link from parent to currentNode
+            this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
+                if (
+                    parentNode.data.uniqueKey === parent.data.uniqueKey &&
+                    childNode.data.uniqueKey === currentNode.uniqueKey
+                ) {
+                    line.material.color.set(color);
+                }
             });
+            // Continue up the chain with this parent
+            currentNode = parent.data;
         }
     }
 

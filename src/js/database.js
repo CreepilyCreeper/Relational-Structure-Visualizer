@@ -1,6 +1,6 @@
 // Replace with your sheet's ID and sheet name
 const sheetId = '1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA';
-const sheetName = 'Test(1) Data';  //use Main Data for real data, Test(1/2) Data for testing
+const sheetName = 'Rebuild Test(1) Data';  //use Main Data for real data, Test(1/2) Data for testing
 const url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
 const selfieDir = './assets/selfies/';
 const fallbackSelfie = 'fallback.png';
@@ -46,7 +46,7 @@ function getSelfieCroppedPath(selfiePath, name) {
 /**
  * Fetches community data.
  * @param {boolean} useTestData - If true, loads from community.json. If false, loads from Google Sheets.
- * @returns {Promise<object>} - Community data in the same structure as community.json
+ * @returns {Promise<object>} - Community data in the new structure
  */
 const fetchData = async (useTestData = false) => {
     if (useTestData) {
@@ -62,7 +62,6 @@ const fetchData = async (useTestData = false) => {
             console.error('Error fetching community data:', error);
         }
     } else {
-        // Load from Google Sheets
         try {
             const response = await fetch(url);
             if (!response.ok) {
@@ -73,86 +72,55 @@ const fetchData = async (useTestData = false) => {
             // Filter out rows with no name
             const filteredRows = rows.filter(row => row.name && row.name.trim());
 
-            // First, create all members with uniqueKey, but don't process referrals yet
+            // First, create all members with uniqueKey
             const members = await Promise.all(filteredRows.map(async row => {
                 const name = row.name.trim();
                 const joinDate = row.joinDate ? row.joinDate.trim() : '';
                 const uniqueKey = `${name}__${joinDate}`;
                 const selfiePath = await findSelfiePath(name);
                 return {
-                    name: name,
+                    uniqueKey,
+                    name,
                     selfie: selfiePath,
                     selfiecropped: getSelfieCroppedPath(selfiePath, name),
-                    joinDate: joinDate,
-                    uniqueKey: uniqueKey,
-                    // Store original referrals string for now
-                    _rawReferrals: row.referrals,
-                    testimonial: row.testimonial
+                    joinDate,
+                    parent: row.parent ? row.parent.trim() : "",
+                    linktype: row.linktype ? row.linktype.trim() : "",
+                    testimonial: row.testimonial || ""
                 };
             }));
 
-            // Build a lookup: name -> array of member objects sorted by joinDate ascending
-            const nameToMembers = {};
+            // Build a lookup: name -> array of members with that name, sorted by joinDate ascending
+            const nameLookup = {};
             for (const member of members) {
-                if (!nameToMembers[member.name]) nameToMembers[member.name] = [];
-                nameToMembers[member.name].push(member);
+                if (!nameLookup[member.name]) nameLookup[member.name] = [];
+                nameLookup[member.name].push(member);
             }
-            for (const arr of Object.values(nameToMembers)) {
-                arr.sort((a, b) => {
-                    // Compare joinDate as string (ISO or YYYY-MM-DD preferred)
-                    if (a.joinDate < b.joinDate) return -1;
-                    if (a.joinDate > b.joinDate) return 1;
-                    return 0;
-                });
+            for (const arr of Object.values(nameLookup)) {
+                arr.sort((a, b) => (a.joinDate > b.joinDate ? 1 : -1));
             }
 
-            // Now process referrals for each member
+            // For each member, resolve parent to uniqueKey
             for (const member of members) {
-                const parentJoinDate = member.joinDate;
-                const rawReferrals = member._rawReferrals;
-                let referralNames = [];
-                if (rawReferrals) {
-                    referralNames = rawReferrals.split(',').map(s => s.trim()).filter(Boolean);
-                }
-                // Count occurrences of each referral name in the list
-                const nameCounts = {};
-                for (const refName of referralNames) {
-                    nameCounts[refName] = (nameCounts[refName] || 0) + 1;
-                }
-                // For each referral name, find the correct referred nodes
-                const resolvedReferrals = [];
-                for (const [refName, count] of Object.entries(nameCounts)) {
-                    const candidates = (nameToMembers[refName] || []).filter(m => m.joinDate > parentJoinDate);
-                    // Sort by joinDate ascending (already sorted, but filter may change order)
-                    for (let i = 0; i < count; i++) {
-                        if (candidates[i]) {
-                            resolvedReferrals.push(candidates[i].uniqueKey);
+                if (member.parent) {
+                    const parentCandidates = nameLookup[member.parent];
+                    if (parentCandidates && parentCandidates.length > 0) {
+                        // Find the parent with joinDate < member's joinDate, closest to it
+                        let chosenParent = null;
+                        for (const candidate of parentCandidates) {
+                            if (candidate.joinDate < member.joinDate) {
+                                if (
+                                    !chosenParent ||
+                                    candidate.joinDate > chosenParent.joinDate
+                                ) {
+                                    chosenParent = candidate;
+                                }
+                            }
                         }
-                        // If not enough candidates, skip
+                        member.parent = chosenParent ? chosenParent.uniqueKey : "";
+                    } else {
+                        member.parent = "";
                     }
-                }
-                member.referrals = resolvedReferrals;
-                delete member._rawReferrals;
-            }
-
-            // Special logic: nodes with joinDate === '0' link to all nodes without parent nodes
-            // 1. Build a set of all uniqueKeys that are referred to by any node
-            const referredSet = new Set();
-            for (const member of members) {
-                if (Array.isArray(member.referrals)) {
-                    for (const ref of member.referrals) {
-                        referredSet.add(ref);
-                    }
-                }
-            }
-            // 2. Find all nodes that are not referred to by anyone (orphans)
-            const orphanNodes = members.filter(m => !referredSet.has(m.uniqueKey));
-            // 3. For each node with joinDate === '0', set its referrals to all orphan nodes (by uniqueKey)
-            for (const member of members) {
-                if (member.joinDate === '0') {
-                    member.referrals = orphanNodes
-                        .filter(o => o.uniqueKey !== member.uniqueKey) // avoid self-link
-                        .map(o => o.uniqueKey);
                 }
             }
 

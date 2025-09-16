@@ -12,13 +12,11 @@ class Node {
             ...config
         };
         this.originalScale = this.config.nodeSize;
-        this.sprite = null; // <-- Add this line
-        this.spriteScale = 5; // Default sprite scale
+        this.sprite = null;
+        this.spriteScale = 5;
     }
 
     async createNode(allYears = null) {
-        //console.log(`Creating node for ${this.data.name}, selfie path: ${this.data.selfie}`);
-        
         const geometry = new THREE.SphereGeometry(this.originalScale, 32, 32);
         const color = new THREE.Color(this.config.nodeColor);
         const material = new THREE.MeshBasicMaterial({
@@ -26,8 +24,7 @@ class Node {
             transparent: false
         });
         this.mesh = new THREE.Mesh(geometry, material);
-        
-        // Only add glow effect if enabled in config
+
         if (this.config.glowEffect) {
             const glowGeometry = new THREE.SphereGeometry(this.originalScale * 1.2, 16, 16);
             const glowMaterial = new THREE.MeshBasicMaterial({
@@ -36,30 +33,29 @@ class Node {
                 opacity: 0.3,
                 side: THREE.BackSide
             });
-            
             const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
             this.mesh.add(glowMesh);
         }
-        
-        // Add user data for interactions
+
+        // Add user data for interactions (no referrals, use parent/linktype)
         this.mesh.userData = {
             uniqueKey: this.data.uniqueKey,
             name: this.data.name,
             joinDate: this.data.joinDate,
-            referrals: this.data.referrals || [],
+            parent: this.data.parent || "",
+            linktype: this.data.linktype || "",
             selfie: this.data.selfie,
             selfiecropped: this.data.selfiecropped,
+            testimonial: this.data.testimonial,
             nodeInstance: this
         };
-        
+
         // --- Add Sprite for Cropped Image with fallback ---
         if (this.data.selfiecropped && this.data.uniqueKey) {
-            // 1. Use a fallback texture first (solid color or default image)
             const fallbackTexture = new THREE.TextureLoader().load('./assets/selfiescropped/fallback_CROPPED.jpg');
             const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
             this.sprite = new THREE.Sprite(spriteMaterial);
             this.sprite.renderOrder = 999;
-            // Start hidden if not in cropped mode
             const initialScale = (this.useCroppedImage ? this.spriteScale : 0);
             this.sprite.scale.set(this.originalScale * initialScale, this.originalScale * initialScale, 1);
             this.sprite.center.set(0.5, 0.5);
@@ -70,26 +66,26 @@ class Node {
             this.sprite.userData = {
                 name: this.data.name,
                 joinDate: this.data.joinDate,
-                referrals: this.data.referrals || [],
+                parent: this.data.parent || "",
+                linktype: this.data.linktype || "",
                 selfie: this.data.selfie,
                 selfiecropped: this.data.selfiecropped,
+                testimonial: this.data.testimonial,
                 nodeInstance: this
             };
 
-            // 2. Load the real image in the background
+            // Load the real image in the background
             this.loadTexturePromise(this.data.selfiecropped)
                 .then(texture => {
-                    // 3. Swap in the real texture when loaded
                     this.sprite.material.map = texture;
                     this.sprite.material.needsUpdate = true;
                 })
                 .catch(() => {
-                    // If loading fails, fallbackTexture remains in use
                     this.sprite.material.map = fallbackTexture;
                     this.sprite.material.needsUpdate = true;
                 });
         }
-        
+
         return this.mesh;
     }
 
@@ -111,11 +107,13 @@ class Node {
                 uniqueKey: this.data.uniqueKey,
                 name: this.data.name,
                 joinDate: this.data.joinDate,
-                referrals: this.data.referrals || [],
+                parent: this.data.parent || "",
+                linktype: this.data.linktype || "",
                 selfie: this.data.selfie,
                 selfiecropped: this.data.selfiecropped,
+                testimonial: this.data.testimonial,
                 nodeInstance: this
-            };  
+            };
         }
     }
 

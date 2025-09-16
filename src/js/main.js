@@ -15,6 +15,7 @@ const cameraConfig = {
     phi: Math.PI / 3
 };
 
+
 const visualizerConfig = {
     nodeSize: 0.2,
     nodeColor: 0xffffff,
@@ -24,8 +25,8 @@ const visualizerConfig = {
     firstLayerTension: -10,
     nodeRepulsion: 50,
     firstLayerRepulsion: 10,
-    sameParentRepulsion: 2, //feeds into hooke's law
-    sameParentSpringLength: 2.5, //feeds into hooke's law
+    sameParentRepulsion: 1, //feeds into hooke's law
+    sameParentSpringLength: 5, //feeds into hooke's law
     damping: 0.2,             //0 is max damping, positive is less damping
     clamping: 100.0,            //clamping of maximum force applied
     verticalSpacing: 4.0,
