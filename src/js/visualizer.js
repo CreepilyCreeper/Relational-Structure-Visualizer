@@ -47,7 +47,7 @@ class Visualizer {
             firstLayerRepulsion: 5, // <-- Add this line for configurable first-layer repulsion
             sameParentSpringLength: 2.0,
             damping: 0.8,
-            clamping: 1.0,
+            clamping: 10.0,
             verticalSpacing: 3.0,
             glowEffect: false,
             rootNodeName: "Root", // configurable root node name

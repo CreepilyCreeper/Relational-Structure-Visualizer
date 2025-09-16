@@ -1,6 +1,6 @@
 // Replace with your sheet's ID and sheet name
 const sheetId = '1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA';
-const sheetName = 'Rebuild Test(1) Data';  //use Main Data for real data, Test(1/2) Data for testing
+const sheetName = 'Rebuild Test(2) Data';  //use Main Data for real data, Test(1/2) Data for testing
 const url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
 const selfieDir = './assets/selfies/';
 const fallbackSelfie = 'fallback.png';

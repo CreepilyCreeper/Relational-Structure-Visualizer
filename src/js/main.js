@@ -23,12 +23,11 @@ const visualizerConfig = {
     centeringForce: 0.01, // configurable centering force (default 0.05)
     layerTension: -75.0,    //always do negative
     firstLayerTension: -10,
-    nodeRepulsion: 50,
+    nodeRepulsion: 20,
     firstLayerRepulsion: 10,
-    sameParentRepulsion: 1, //feeds into hooke's law
-    sameParentSpringLength: 5, //feeds into hooke's law
+    sameParentRepulsion: 5, //feeds into hooke's law
+    sameParentSpringLength: 2.5, //feeds into hooke's law
     damping: 0.2,             //0 is max damping, positive is less damping
-    clamping: 100.0,            //clamping of maximum force applied
     verticalSpacing: 4.0,
     glowEffect: false,
     rootNodeName: "Christ",
