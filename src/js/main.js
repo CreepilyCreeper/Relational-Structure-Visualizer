@@ -4,7 +4,6 @@ import { Visualizer } from './visualizer.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { WebGLRenderTarget, HalfFloatType } from 'three';
 
 // Camera configuration (hardcoded)
@@ -37,6 +36,14 @@ const visualizerConfig = {
     color_final: 0x00FFFF, // #00FFFF
     color_hover: 0xff0000, // #ff0000
     color_line: 0x808080, // #808080
+    color_prc: 0xffffff, // <-- PRC node color (default: white)
+    linktypeColors: {    // Example: "mentor": 0x00ff00, "collab": 0x0000ff
+        UFO: 0x808080,      // #808080
+        Alpha: 0xfcd392,    // #C04040
+        Outreach: 0xfba8b6, // #40C040
+    },
+    initphysicsActiveDuration: 3000, // ms, configurable pause duration
+    postphysicsActiveDuration: 5000, // ms, configurable pause duration
 };
 
 // Scene setup
@@ -158,6 +165,8 @@ renderer.domElement.addEventListener('mousemove', (event) => {
     if (mouseDown && draggingNode) {
         const mouseWorld = getMouseWorldPositionAtY(mouse, camera, dragLayerY);
         draggingNode.position.copy(mouseWorld.add(dragOffset));
+        // Fire custom event to resume physics
+        window.dispatchEvent(new Event('visualizer-node-drag'));
     } else if (mouseDown) {
         const deltaX = event.clientX - mouseX;
         const deltaY = event.clientY - mouseY;
@@ -260,6 +269,8 @@ renderer.domElement.addEventListener('touchmove', (event) => {
         if (draggingNode) {
             const mouseWorld = getMouseWorldPositionAtY(pos, camera, dragLayerY);
             draggingNode.position.copy(mouseWorld.add(dragOffset));
+            // Fire custom event to resume physics
+            window.dispatchEvent(new Event('visualizer-node-drag'));
         } else {
             const deltaX = pos.clientX - mouseX;
             const deltaY = pos.clientY - mouseY;

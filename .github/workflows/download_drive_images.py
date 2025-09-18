@@ -5,7 +5,10 @@ import mimetypes
 import json
 import shutil
 
-SHEET_URL = "https://opensheet.elk.sh/1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA/Main%20Data"
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config.json')
+with open(CONFIG_PATH, 'r') as f:
+    config = json.load(f)
+SHEET_URL = f"https://opensheet.elk.sh/{config['sheetId']}/{config['sheetName']}"
 SELFIE_DIR = "src/assets/selfies"
 WORKFLOWS_DIR = os.path.dirname(__file__)
 DOWNLOADED_IMAGES = os.path.join(WORKFLOWS_DIR, "downloaded_images.json")

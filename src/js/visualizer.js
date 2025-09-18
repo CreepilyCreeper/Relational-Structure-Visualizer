@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { Node } from './node.js';
+// Add these imports for fat lines:
+import { Line2 } from 'three/examples/jsm/lines/Line2.js';
+import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
+import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 
 class Visualizer {
 
@@ -39,30 +43,46 @@ class Visualizer {
         this.config = {
             nodeSize: 0.5,
             nodeColor: 0xffffff,
-            centeringForce: 0.1, // configurable centering force (default 0.05)
+            centeringForce: 0.1,
             layerTension: 1.0,
             firstLayerTension: -1,
             nodeRepulsion: 1.0,
-            sameParentRepulsion: 0.5, // <-- Add this line for configurable same-parent repulsion
-            firstLayerRepulsion: 5, // <-- Add this line for configurable first-layer repulsion
+            sameParentRepulsion: 0.5,
+            firstLayerRepulsion: 5,
             sameParentSpringLength: 2.0,
             damping: 0.8,
             clamping: 10.0,
             verticalSpacing: 3.0,
             glowEffect: false,
-            rootNodeName: "Root", // configurable root node name
-            nodePlacementInterval: 1, // configurable interval
-            color_initial: 0xFFFF00, // #FFFF00
-            color_mid: 0x80FF80, // #80FF80
-            color_final: 0x00FFFF, // #00FFFF
-            color_hover: 0xff0000, // #ff0000
-            color_line: 0x808080, // #808080
+            rootNodeName: "Root",
+            nodePlacementInterval: 1,
+            color_initial: 0x80FF80,
+            color_mid: 0x40FFC0,
+            color_final: 0x00FFFF,
+            color_hover: 0xff0000,
+            color_line: 0x808080,
+            color_prc: 0xffffff, // <-- PRC node color (default: white)
+            linktypeColors: {
+                UFO: 0x808080,
+                Alpha: 0xfcd392,
+                Outreach: 0xfba8b6,
+            },
+            linktypeWidths: { // Add this for per-linktype linewidths
+                UFO: 1,
+                Alpha: 2,
+                Outreach: 2,
+                default: 1
+            },
+            initphysicsActiveDuration: 20000, // ms, configurable pause duration
         };
         this.placedNodeCount = 0; // Track how many nodes are placed
         this.iter = 0;
         this.clampVectorMax = new THREE.Vector3(this.config.clamping, this.config.clamping, this.config.clamping);
         this.clampVectorMin = new THREE.Vector3(-this.config.clamping, -this.config.clamping, -this.config.clamping);
         this.useCroppedImages = false; // <-- Add this line
+        this._physicsTimeout = null;
+        this._physicsPaused = false;
+        this._resumePhysicsOnDrag = this._resumePhysicsOnDrag.bind(this);
     }
 
     setUseCroppedImages(flag) {
@@ -71,6 +91,24 @@ class Visualizer {
 
     async renderTree(data) {
         this.clearNodes();
+
+        // --- Sort data so that for any node, its parent (even in same layer) comes first ---
+        const dataMap = new Map(data.map(person => [person.uniqueKey, person]));
+        const sorted = [];
+        const visited = new Set();
+
+        function visit(node) {
+            if (visited.has(node.uniqueKey)) return;
+            if (node.parent && dataMap.has(node.parent)) {
+                visit(dataMap.get(node.parent));
+            }
+            visited.add(node.uniqueKey);
+            sorted.push(node);
+        }
+        data.forEach(person => visit(person));
+
+        // Use sorted data from here on
+        data = sorted;
 
         // Get all unique years for color calculation
         const allYears = [...new Set(data.map(person => person.joinDate))].sort();
@@ -115,6 +153,11 @@ class Visualizer {
             layer.forEach(node => {
                 node.data._layerColor = color;
                 node.config = { ...node.config, nodeColor: color.getHex() };
+
+                // --- PRC node color override ---
+                if (node.data.nodetype === "prc") {
+                    node.config.nodeColor = this.config.color_prc;
+                }
             });
         });
 
@@ -188,8 +231,49 @@ class Visualizer {
         let lastFpsTime = performance.now();
         let frameCount = 0;
 
+        // --- Physics pause logic ---
+        let initialPauseTimerStarted = false;
+
+        const startPhysicsTimeout = (init = false) => {
+            console.log(`Physics will pause in ${init ? this.config.initphysicsActiveDuration : this.config.postphysicsActiveDuration} ms`);
+            if (this._physicsTimeout) clearTimeout(this._physicsTimeout);
+            this._physicsTimeout = setTimeout(() => {
+                this._pausePhysics();
+            }, init ? this.config.initphysicsActiveDuration : this.config.postphysicsActiveDuration);
+        };
+
+        this._pausePhysics = () => {
+            this._physicsPaused = true;
+        };
+
+        this._resumePhysics = () => {
+            if (this._physicsPaused) {
+                this._physicsPaused = false;
+                startPhysicsTimeout(false); // Use postphysicsActiveDuration after resume
+            }
+        };
+
+        // Listen for drag events to resume physics
+        if (!this._dragListenerAttached) {
+            window.addEventListener('visualizer-node-drag', this._resumePhysicsOnDrag);
+            this._dragListenerAttached = true;
+        }
+
         const animateIteration = () => {
             if (!this.isAnimating) return;
+            if (this._physicsPaused) {
+                requestAnimationFrame(animateIteration);
+                return;
+            }
+
+            // Start initial pause timer after all nodes are placed
+            if (
+                !initialPauseTimerStarted &&
+                this.placedNodeCount >= this.allNodesFlat.length
+            ) {
+                initialPauseTimerStarted = true;
+                startPhysicsTimeout(true); // Start initial timer now
+            }
 
             // --- FPS Meter logic ---
             frameCount++;
@@ -324,6 +408,10 @@ class Visualizer {
         animateIteration();
     }
 
+    _resumePhysicsOnDrag() {
+        this._resumePhysics();
+    }
+
     applyLayerTension(layers) {
         // Flatten all placed nodes for easy lookup
         const allNodes = layers.flat();
@@ -429,20 +517,49 @@ class Visualizer {
     }
 
     async animateConnection(parentNode, childNode) {
-        // Animated line: grows from parent to child
-        const points = [
-            parentNode.position.clone(),
-            parentNode.position.clone() // start as a zero-length line
+        // Use Line2 for fat lines
+        const start = parentNode.position.clone();
+        const end = parentNode.position.clone(); // start as a zero-length line
+
+        // LineGeometry expects flat arrays
+        const positions = [
+            start.x, start.y, start.z,
+            end.x, end.y, end.z
         ];
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({
-            color: this.config.color_line,
+
+        const geometry = new LineGeometry();
+        geometry.setPositions(positions);
+
+        // Determine line color by linktype
+        let lineColor = this.config.color_line;
+        if (childNode.data.linktype && this.config.linktypeColors[childNode.data.linktype]) {
+            lineColor = this.config.linktypeColors[childNode.data.linktype];
+        } else if (this.config.linktypeColors.default) {
+            lineColor = this.config.linktypeColors.default;
+        }
+
+        // Determine line width by linktype
+        let lineWidth = 2;
+        if (childNode.data.linktype && this.config.linktypeWidths[childNode.data.linktype]) {
+            lineWidth = this.config.linktypeWidths[childNode.data.linktype];
+        } else if (this.config.linktypeWidths.default) {
+            lineWidth = this.config.linktypeWidths.default;
+        }
+
+        const material = new LineMaterial({
+            color: lineColor,
+            linewidth: lineWidth, // in world units
             transparent: true,
-            opacity: 0.0
+            opacity: 0.0,
+            // resolution is required for LineMaterial
+            resolution: new THREE.Vector2(window.innerWidth, window.innerHeight)
         });
-        const line = new THREE.Line(geometry, material);
+
+        const line = new Line2(geometry, material);
+        line.computeLineDistances();
+        line.scale.set(1, 1, 1);
         this.scene.add(line);
-        this.animatedConnections.push({ line, parentNode, childNode });
+        this.animatedConnections.push({ line, parentNode, childNode, geometry, material });
 
         // Animate opacity and length
         let progress = 0;
@@ -453,23 +570,30 @@ class Visualizer {
             progress = i / steps;
             // Interpolate endpoint
             const newEnd = parentNode.position.clone().lerp(childNode.position, progress);
-            geometry.setFromPoints([parentNode.position, newEnd]);
+            geometry.setPositions([
+                parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                newEnd.x, newEnd.y, newEnd.z
+            ]);
             material.opacity = progress;
+            material.needsUpdate = true;
         }
         // Ensure final state
-        geometry.setFromPoints([parentNode.position, childNode.position]);
+        geometry.setPositions([
+            parentNode.position.x, parentNode.position.y, parentNode.position.z,
+            childNode.position.x, childNode.position.y, childNode.position.z
+        ]);
         material.opacity = 1.0;
+        material.needsUpdate = true;
     }
 
     updateAnimatedConnections() {
         if (!this.animatedConnections) return;
-        this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
-            // Only update line geometry if both nodes are placed
+        this.animatedConnections.forEach(({ line, parentNode, childNode, geometry }) => {
             if (parentNode.isPlaced && childNode.isPlaced) {
-                const positions = [parentNode.position, childNode.position];
-                line.geometry.setFromPoints(positions);
-                line.geometry.computeBoundingSphere(); // <-- Add this
-                line.geometry.computeBoundingBox();    // <-- Add this
+                geometry.setPositions([
+                    parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                    childNode.position.x, childNode.position.y, childNode.position.z
+                ]);
                 line.visible = true;
             } else {
                 line.visible = false;

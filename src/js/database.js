@@ -1,7 +1,17 @@
-// Replace with your sheet's ID and sheet name
-const sheetId = '1iqLhPX7cjypuQqd741NkuWjM96AJAxOtlNPeNwXECQA';
-const sheetName = 'Rebuild Test(2) Data';  //use Main Data for real data, Test(1/2) Data for testing
-const url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
+// At the top of your file
+let sheetId = '';
+let sheetName = '';
+let url = '';
+
+async function loadConfig() {
+    const response = await fetch('../../config.json');
+    const config = await response.json();
+    sheetId = config.sheetId;
+    sheetName = config.sheetName;
+    url = `https://opensheet.elk.sh/${sheetId}/${sheetName}`;
+}
+await loadConfig();
+
 const selfieDir = './assets/selfies/';
 const fallbackSelfie = 'fallback.png';
 
@@ -86,6 +96,7 @@ const fetchData = async (useTestData = false) => {
                     joinDate,
                     parent: row.parent ? row.parent.trim() : "",
                     linktype: row.linktype ? row.linktype.trim() : "",
+                    nodetype: row.nodetype ? row.nodetype.trim() : "",
                     testimonial: row.testimonial || ""
                 };
             }));
@@ -108,10 +119,10 @@ const fetchData = async (useTestData = false) => {
                         // Find the parent with joinDate < member's joinDate, closest to it
                         let chosenParent = null;
                         for (const candidate of parentCandidates) {
-                            if (candidate.joinDate < member.joinDate) {
+                            if (candidate.joinDate <= member.joinDate) {
                                 if (
                                     !chosenParent ||
-                                    candidate.joinDate > chosenParent.joinDate
+                                    candidate.joinDate >= chosenParent.joinDate
                                 ) {
                                     chosenParent = candidate;
                                 }

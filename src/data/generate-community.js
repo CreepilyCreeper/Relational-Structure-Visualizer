@@ -68,6 +68,18 @@ for (let l = 1; l <= config.layers; l++) {
       }
     }
 
+    // --- Allow rare same-layer parent assignment (except for layer 1) ---
+    let allowSameLayerParent = false;
+    if (l > 1 && Math.random() < 0.03) { // ~3% chance
+      // Only allow if there are at least 2 nodes in this layer
+      if (nodeNames[l].length > 1) {
+        // Exclude self from eligible parents
+        const sameLayerParents = nodeNames[l].filter(p => p !== name);
+        eligibleParents = eligibleParents.concat(sameLayerParents);
+        allowSameLayerParent = true;
+      }
+    }
+
     // Filter parents that have not exceeded maxReferrals
     eligibleParents = eligibleParents.filter(parentName =>
       parentChildCounts[parentName] < config.maxReferrals
@@ -75,16 +87,31 @@ for (let l = 1; l <= config.layers; l++) {
 
     // If no eligible parent, assign root as parent
     let parent = "";
-    if (eligibleParents.length > 0) {
+    if (l === 1) {
+      // All first layer nodes must have Christ as parent
+      parent = rootNode.name;
+      parentChildCounts[rootNode.name]++;
+    } else if (eligibleParents.length > 0) {
       parent = eligibleParents[getRandomInt(0, eligibleParents.length - 1)];
       parentChildCounts[parent]++;
     } else {
       parent = rootNode.name;
       parentChildCounts[rootNode.name]++;
     }
-
-    const linktype = "referral";
-    const node = { name, selfie, joinDate, parent, linktype };
+    
+    // Randomly assign linktype (80% "Christian", 10% "PRC", 10% "Other")
+    let linktype;
+    const rand = Math.random();
+    if (rand < 0.8) {
+      linktype = "UFO";
+    } else if (rand < 0.9) {
+      linktype = "Alpha";
+    } else {
+      linktype = "Outreach";
+    }
+    // Randomly assign nodetype (80% referral, 20% other)
+    const nodetype = Math.random() < 0.8 ? "Christian" : "PRC";
+    const node = { name, selfie, joinDate, parent, linktype, nodetype };
     members.push(node);
     nodeObjects[name] = node;
   }
@@ -111,8 +138,19 @@ for (let l = 1; l <= config.layers; l++) {
             if (parentChildCounts[child.parent] !== undefined) {
               parentChildCounts[child.parent]--;
             }
+
             child.parent = parentName;
-            child.linktype = "referral";
+            // Randomly assign linktype (80% "Christian", 10% "PRC", 10% "Other")
+            const rand = Math.random();
+            if (rand < 0.9) {
+              child.linktype = "UFO";
+            } else if (rand < 0.9) {
+              child.linktype = "Alpha";
+            } else {
+              child.linktype = "Outreach";
+            }
+            // Randomly assign nodetype (80% referral, 20% other)
+            child.nodetype = Math.random() < 0.8 ? "Christian" : "PRC";
             parentChildCounts[parentName]++;
             // Stop if minReferrals reached
             if (parentChildCounts[parentName] >= config.minReferrals) break;
@@ -129,14 +167,15 @@ fs.writeFileSync('test_data_community.json', JSON.stringify({ members }, null, 2
 
 // Generate TSV for Google Sheets
 const tsvRows = [
-  'name	selfie	joinDate	parent	linktype',
+  'name	selfie	joinDate	parent	linktype	nodetype',
   ...members.map(m => {
     const name = m.name;
     const selfie = '';
     const joinDate = m.joinDate;
     const parent = m.parent || '';
     const linktype = m.linktype || '';
-    return [name, selfie, joinDate, parent, linktype].join('\t');
+    const nodetype = m.nodetype || '';
+    return [name, selfie, joinDate, parent, linktype, nodetype].join('\t');
   })
 ];
 fs.writeFileSync('test_data_community-sheet.tsv', tsvRows.join('\n'));
