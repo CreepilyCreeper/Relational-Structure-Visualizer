@@ -14,23 +14,21 @@ const cameraConfig = {
     phi: Math.PI / 3
 };
 
-
 const visualizerConfig = {
     nodeSize: 0.2,
     nodeColor: 0xffffff,
-    linkHighlightColor: 0xff0000, // configurable highlight color
-    centeringForce: 0.01, // configurable centering force (default 0.05)
-    layerTension: -75.0,    //always do negative
+    linkHighlightColor: 0xff0000,
+    centeringForce: 0.01,
+    layerTension: -75.0,
     firstLayerTension: -10,
     nodeRepulsion: 20,
     firstLayerRepulsion: 10,
-    sameParentRepulsion: 5, //feeds into hooke's law
-    sameParentSpringLength: 2.5, //feeds into hooke's law
-    damping: 0.2,             //0 is max damping, positive is less damping
+    sameParentRepulsion: 5,
+    sameParentSpringLength: 2.5,
+    damping: 0.2,
     verticalSpacing: 4.0,
-    glowEffect: false,
     rootNodeName: "Christ",
-    nodePlacementInterval: 1, // configurable interval
+    nodePlacementInterval: 1,
     color_initial: 0xFFFF00, // #FFFF00
     color_mid: 0x80FF80, // #80FF80
     color_final: 0x00FFFF, // #00FFFF
@@ -42,9 +40,25 @@ const visualizerConfig = {
         Alpha: 0xfcd392,    // #C04040
         Outreach: 0xfba8b6, // #40C040
     },
-    initphysicsActiveDuration: 3000, // ms, configurable pause duration
-    postphysicsActiveDuration: 5000, // ms, configurable pause duration
+    physicsThrottle: 1, // frames, configurable throttle
+    repulsionRadius: 10, // <--- Add this: radius for quadtree neighbor search
+    bloom: true, // Enable or disable bloom pass
+    bloomStrength: 0.5,
+    bloomRadius: 0,
+    bloomThreshold: 0.5,
 };
+
+// --- Cache DOM elements at the top ---
+const visualizerContainer = document.getElementById('visualizer-container');
+const sideMenu = document.getElementById('side-menu');
+const sidebarSearch = document.getElementById('sidebar-search');
+const nodeNameElem = document.getElementById('node-name');
+const nodeImageElem = document.getElementById('node-image');
+const nodeDetailsElem = document.getElementById('node-details');
+const croppedToggle = document.getElementById('cropped-toggle');
+const spriteScaleSlider = document.getElementById('sprite-scale-slider');
+const toggleNamesBtn = document.getElementById('toggle-names');
+const nodeLabelsContainer = document.getElementById('node-labels-container');
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -52,32 +66,27 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setPixelRatio(window.devicePixelRatio); // Cap pixel ratio for performance
 renderer.setClearColor(0x050505, 1);
 renderer.shadowMap.enabled = false;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-document.getElementById('visualizer-container').appendChild(renderer.domElement);
+visualizerContainer.appendChild(renderer.domElement);
 
 function getSideMenuWidth() {
-    // Get the width from CSS variable
     const rootStyles = getComputedStyle(document.documentElement);
-    console.log('--side-menu-width:', rootStyles.getPropertyValue('--side-menu-width'));
     const width = rootStyles.getPropertyValue('--side-menu-width').trim();
-
     if (width.endsWith('vw')) {
         const percentage = parseFloat(width.replace('vw', ''));
         return (window.innerWidth * percentage) / 100;
     } else if (width.endsWith('px')) {
         return parseInt(width);
     }
-
-    return 0; // Default fallback
+    return 0;
 }
 
 function resizeRenderer() {
     const sideMenuWidth = getSideMenuWidth();
     const width = window.innerWidth - sideMenuWidth;
-    console.log(`Side menu width: ${sideMenuWidth}, Window Width: ${window.innerWidth}, Renderer width: ${width}`);
     const height = window.innerHeight;
     renderer.setSize(width, height);
     composer.setSize(width, height);
@@ -96,7 +105,7 @@ scene.add(ambientLight);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredNode = null;
-let hoveredMesh = null; // Add this line
+let hoveredMesh = null;
 let selectedNode = null;
 
 // Camera controls
@@ -118,7 +127,6 @@ function updateCameraPosition() {
 }
 
 function getMouseWorldPositionAtY(mouse, camera, y) {
-    // Ray from camera through mouse, intersect with plane y=layerY
     const ray = new THREE.Raycaster();
     ray.setFromCamera(mouse, camera);
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -y);
@@ -128,9 +136,9 @@ function getMouseWorldPositionAtY(mouse, camera, y) {
 }
 
 function displayNodeData(node) {
-    document.getElementById('node-name').innerHTML = `${node.name || ''} (${node.joinDate || ''})`;
-    document.getElementById('node-image').src = node.selfie || '';
-    document.getElementById('node-details').innerHTML = node.testimonial ? node.testimonial.replace(/\n/g, '<br>') : '';
+    nodeNameElem.innerHTML = `${node.name || ''} (${node.joinDate || ''})`;
+    nodeImageElem.src = node.selfie || '';
+    nodeDetailsElem.innerHTML = node.testimonial ? node.testimonial.replace(/\n/g, '<br>') : '';
 }
 
 renderer.domElement.addEventListener('mousedown', (event) => {
@@ -358,23 +366,41 @@ const renderTarget = new WebGLRenderTarget(window.innerWidth, window.innerHeight
     format: THREE.RGBAFormat,
     encoding: THREE.sRGBEncoding
 });
-const composer = new EffectComposer(renderer, renderTarget);
-const renderPass = new RenderPass(scene, camera);
-composer.addPass(renderPass);
 
-const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
-    0.5,
-    0,
-    0.85
-);
-composer.addPass(bloomPass);
+let composer = null;
+if (visualizerConfig.bloom) {
+    composer = new EffectComposer(renderer, renderTarget);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        visualizerConfig.bloomStrength,
+        visualizerConfig.bloomRadius,
+        visualizerConfig.bloomThreshold
+    );
+    composer.addPass(bloomPass);
+} else {
+    composer = { 
+        render: () => renderer.render(scene, camera), 
+        setSize: (w, h) => renderer.setSize(w, h) 
+    };
+}
 
 // Initialize visualizer with custom config
 const visualizer = new Visualizer(scene, camera, renderer, composer);
 visualizer.updateConfig(visualizerConfig);
 
-// --- Search Bar Functionality ---
+// --- Node label overlay logic (now handled by Visualizer) ---
+visualizer.setLabelContainer(nodeLabelsContainer);
+
+toggleNamesBtn.addEventListener('click', () => {
+    visualizer.showNodeLabels = !visualizer.showNodeLabels;
+    toggleNamesBtn.textContent = visualizer.showNodeLabels ? "Hide Names" : "Show Names";
+    visualizer.toggleNodeLabels(visualizer.showNodeLabels);
+});
+
+// --- Search Bar Functionality (unchanged, see your original) ---
 let allMembers = [];
 let searchResultsDropdown = null;
 
@@ -424,7 +450,6 @@ function showSearchResults(results) {
 }
 
 function selectNodeFromSearch(member) {
-    // Find the mesh for this member
     const nodeMeshes = visualizer.getNodeMeshes();
     const mesh = nodeMeshes.find(m => m.userData.nodeData && m.userData.nodeData.name === member.name);
     if (mesh) {
@@ -465,15 +490,13 @@ async function init() {
     try {
         const data = await fetchData();
         if (data && data.members) {
-            // Render all nodes and connections immediately, then apply physics
             const { layers } = await visualizer.renderTree(data.members);
-            // Center camera on the layout
             const center = visualizer.getTreeLayoutCenter(layers);
             cameraConfig.center = center;
             updateCameraPosition();
             document.getElementById('side-menu').style.display = 'block';
             resizeRenderer();
-            setupSidebarSearch(data.members); // <-- Add this line
+            setupSidebarSearch(data.members);
         }
     } catch (error) {
         console.error('Failed to initialize visualizer:', error);
@@ -491,22 +514,17 @@ window.addEventListener('resize', () => {
 init();
 
 // Toggle cropped images
-const croppedToggle = document.getElementById('cropped-toggle');
 let croppedMode = false;
 croppedToggle.addEventListener('click', () => {
     croppedMode = !croppedMode;
     croppedToggle.textContent = croppedMode ? "Remove Selfies" : "Show Selfies";
     visualizer.setUseCroppedImages(croppedMode);
-
-    // Animate sprite scale instead of re-rendering
-    const scale = parseFloat(document.getElementById('sprite-scale-slider').value);
+    const scale = parseFloat(spriteScaleSlider.value);
     animateSpriteScale(scale, 400);
 });
 
-const spriteScaleSlider = document.getElementById('sprite-scale-slider');
 spriteScaleSlider.addEventListener('input', (e) => {
     const scale = parseFloat(e.target.value);
-    // Only update scale for visible sprites
     visualizer.nodes.forEach(node => {
         if (node.sprite && node.sprite.visible) {
             node.setSpriteScale(scale);
@@ -522,8 +540,7 @@ function animateSpriteScale(targetScale, duration = 400) {
     function animate() {
         const now = performance.now();
         const t = Math.min(1, (now - startTime) / duration);
-        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // easeInOut
-
+        const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
         nodes.forEach((node, i) => {
             if (node.sprite) {
                 const from = initialScales[i];
@@ -535,11 +552,9 @@ function animateSpriteScale(targetScale, duration = 400) {
                 node.sprite.visible = scale > 0.01;
             }
         });
-
         if (t < 1) {
             requestAnimationFrame(animate);
         } else {
-            // Ensure final state
             nodes.forEach(node => {
                 if (node.sprite) {
                     node.setSpriteScale(croppedMode ? targetScale : 0);
@@ -550,61 +565,5 @@ function animateSpriteScale(targetScale, duration = 400) {
     }
     animate();
 }
-
-// --- Node name label overlay logic ---
-let showNodeLabels = false;
-const toggleNamesBtn = document.getElementById('toggle-names');
-const nodeLabelsContainer = document.getElementById('node-labels-container');
-
-toggleNamesBtn.addEventListener('click', () => {
-    showNodeLabels = !showNodeLabels;
-    toggleNamesBtn.textContent = showNodeLabels ? "Hide Names" : "Show Names";
-    nodeLabelsContainer.style.display = showNodeLabels ? "block" : "none";
-});
-
-function updateNodeLabels() {
-    if (!showNodeLabels) {
-        nodeLabelsContainer.innerHTML = '';
-        return;
-    }
-    const rect = renderer.domElement.getBoundingClientRect();
-    nodeLabelsContainer.innerHTML = '';
-    visualizer.nodes.forEach(node => {
-        if (!node.isPlaced) return;
-        // Project 3D position to 2D screen
-        const pos = node.position.clone();
-        pos.project(camera);
-        const x = (pos.x * 0.5 + 0.5) * rect.width + rect.left;
-        const y = (-pos.y * 0.5 + 0.5) * rect.height + rect.top;
-        const label = document.createElement('div');
-        label.className = 'node-label';
-        label.textContent = node.data.name;
-        label.style.left = `${x}px`;
-        label.style.top = `${y - 18}px`; // above node
-        nodeLabelsContainer.appendChild(label);
-    });
-}
-
-// --- Patch animation/render loop to update labels ---
-const oldRender = visualizer.composer
-    ? visualizer.composer.render.bind(visualizer.composer)
-    : renderer.render.bind(renderer);
-
-function renderWithLabels() {
-    oldRender();
-    updateNodeLabels();
-    requestAnimationFrame(renderWithLabels);
-}
-
-// Only start our custom loop after visualizer.renderTree is called
-const origRenderTree = visualizer.renderTree.bind(visualizer);
-visualizer.renderTree = async function(...args) {
-    const result = await origRenderTree(...args);
-    if (!window._labelsRenderLoopStarted) {
-        window._labelsRenderLoopStarted = true;
-        renderWithLabels();
-    }
-    return result;
-};
 
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Node } from './node.js';
+import { Quadtree } from './quadtree.js';
 // Add these imports for fat lines:
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
@@ -38,9 +39,9 @@ class Visualizer {
         this.renderer = renderer;
         this.composer = composer;
         this.nodes = [];
-        this.connections = [];
         this.isAnimating = false;
         this.config = {
+            nodeComplexity: 8,  // default: 16
             nodeSize: 0.5,
             nodeColor: 0xffffff,
             centeringForce: 0.1,
@@ -53,7 +54,6 @@ class Visualizer {
             damping: 0.8,
             clamping: 10.0,
             verticalSpacing: 3.0,
-            glowEffect: false,
             rootNodeName: "Root",
             nodePlacementInterval: 1,
             color_initial: 0x80FF80,
@@ -73,20 +73,30 @@ class Visualizer {
                 Outreach: 2,
                 default: 1
             },
-            initphysicsActiveDuration: 20000, // ms, configurable pause duration
+            physicsThrottle: 1, // <--- Add this: recalc physics every N frames (default: 1 = every frame)
+            repulsionRadius: 10, // <--- Add this: radius for quadtree neighbor search
         };
-        this.placedNodeCount = 0; // Track how many nodes are placed
+        this.placedNodeCount = 0;
         this.iter = 0;
         this.clampVectorMax = new THREE.Vector3(this.config.clamping, this.config.clamping, this.config.clamping);
         this.clampVectorMin = new THREE.Vector3(-this.config.clamping, -this.config.clamping, -this.config.clamping);
-        this.useCroppedImages = false; // <-- Add this line
-        this._physicsTimeout = null;
-        this._physicsPaused = false;
-        this._resumePhysicsOnDrag = this._resumePhysicsOnDrag.bind(this);
+        this.useCroppedImages = false;
+
+        // Add reusable temp vectors for force calculations
+        this._tempVec1 = new THREE.Vector3();
+        this._tempVec2 = new THREE.Vector3();
+
+        // InstancedMesh related
+        this.instancedMesh = null;
+        this._instancedMeshNeedsUpdate = false;
     }
 
     setUseCroppedImages(flag) {
+        // Animate sprite scale in/out based on flag
+        // The actual scale value is controlled by main.js via animateSpriteScale
         this.useCroppedImages = flag;
+        // No need to set node.useCroppedImage anymore
+        // Sprite scale/visibility is handled externally
     }
 
     async renderTree(data) {
@@ -120,7 +130,7 @@ class Visualizer {
         // Create nodes first and add to scene immediately
         data.forEach(person => {
             const node = new Node(person, this.config);
-            node.useCroppedImage = this.useCroppedImages;
+            // node.useCroppedImage = this.useCroppedImages; // REMOVE THIS LINE
             nodeMap.set(person.uniqueKey, node);
             this.nodes.push(node);
         });
@@ -166,7 +176,7 @@ class Visualizer {
 
         // Create meshes for all nodes and add to scene
         for (const node of this.nodes) {
-            node.useCroppedImage = this.useCroppedImages;
+            // node.useCroppedImage = this.useCroppedImages; // REMOVE THIS LINE
             const mesh = await node.createNode(allYears);
             mesh.position.copy(node.position);
             mesh.scale.set(1, 1, 1);
@@ -175,13 +185,28 @@ class Visualizer {
             node.mesh = mesh;
         }
 
+        // --- InstancedMesh optimization ---
+        if (this.instancedMesh) {
+            this.scene.remove(this.instancedMesh);
+            this.instancedMesh = null;
+        }
+        const sphereGeometry = new THREE.SphereGeometry(this.config.nodeSize, this.config.nodeComplexity, this.config.nodeComplexity);
+        const sphereMaterial = new THREE.MeshStandardMaterial({ color: this.config.nodeColor });
+        this.instancedMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, this.nodes.length);
+        this.instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        this.scene.add(this.instancedMesh);
+        this._instancedMeshNeedsUpdate = true;
+
         // Draw all connections (animated)
         await this.createAnimatedConnections(data, nodeMap);
 
         // Start render loop with physics
         if (!this.isAnimating) {
-            this.startPhysicsRenderLoop(layers);
+            this.startPhysicsRenderLoop(nodeMap);
         }
+
+        // Save nodeMap for later use if needed elsewhere
+        this._nodeMap = nodeMap;
 
         return { layers, allYears, data, nodeMap };
     }
@@ -216,7 +241,7 @@ class Visualizer {
         return layers;
     }
 
-    startPhysicsRenderLoop(layers) {
+    startPhysicsRenderLoop(nodeMap) {
         this.isAnimating = true;
         const damping = this.config.damping;
 
@@ -231,49 +256,11 @@ class Visualizer {
         let lastFpsTime = performance.now();
         let frameCount = 0;
 
-        // --- Physics pause logic ---
-        let initialPauseTimerStarted = false;
-
-        const startPhysicsTimeout = (init = false) => {
-            console.log(`Physics will pause in ${init ? this.config.initphysicsActiveDuration : this.config.postphysicsActiveDuration} ms`);
-            if (this._physicsTimeout) clearTimeout(this._physicsTimeout);
-            this._physicsTimeout = setTimeout(() => {
-                this._pausePhysics();
-            }, init ? this.config.initphysicsActiveDuration : this.config.postphysicsActiveDuration);
-        };
-
-        this._pausePhysics = () => {
-            this._physicsPaused = true;
-        };
-
-        this._resumePhysics = () => {
-            if (this._physicsPaused) {
-                this._physicsPaused = false;
-                startPhysicsTimeout(false); // Use postphysicsActiveDuration after resume
-            }
-        };
-
-        // Listen for drag events to resume physics
-        if (!this._dragListenerAttached) {
-            window.addEventListener('visualizer-node-drag', this._resumePhysicsOnDrag);
-            this._dragListenerAttached = true;
-        }
+        // --- Physics throttling ---
+        let physicsFrameCounter = 0;
 
         const animateIteration = () => {
             if (!this.isAnimating) return;
-            if (this._physicsPaused) {
-                requestAnimationFrame(animateIteration);
-                return;
-            }
-
-            // Start initial pause timer after all nodes are placed
-            if (
-                !initialPauseTimerStarted &&
-                this.placedNodeCount >= this.allNodesFlat.length
-            ) {
-                initialPauseTimerStarted = true;
-                startPhysicsTimeout(true); // Start initial timer now
-            }
 
             // --- FPS Meter logic ---
             frameCount++;
@@ -346,8 +333,8 @@ class Visualizer {
             // Only apply forces to placed nodes
             const placedLayers = this.layersForPlacement.map(layer => layer.filter(n => n.isPlaced));
 
-            this.applyLayerTension(placedLayers);
-            this.applySameLayerRepulsion(placedLayers);
+            this.applyLayerTension(placedLayers, nodeMap);
+            this.applySameLayerRepulsion(placedLayers, nodeMap);
 
             // --- Centering force (applied in x and z only) ---
             this.nodes.forEach(node => {
@@ -379,28 +366,58 @@ class Visualizer {
                 }
                 if (!node.velocity) node.velocity = new THREE.Vector3(0, 0, 0);
                 if (!node.force) node.force = new THREE.Vector3(0, 0, 0);
-                node.velocity.add(node.force.clone().multiplyScalar(0.1));
-                node.velocity.multiplyScalar(damping);
+                physicsFrameCounter++;
+                const doPhysics = (physicsFrameCounter % (this.config.physicsThrottle || 1)) === 0;
+                // Only update velocity/position if physics was calculated this frame
+                if (doPhysics) {
+                    node.velocity.add(node.force.clone().multiplyScalar(0.1));
+                    node.velocity.multiplyScalar(damping);
+                }
                 const newPos = node.position.clone().add(node.velocity);
                 node.position.x = newPos.x;
                 node.position.z = newPos.z;
                 if (node.mesh) {
                     node.mesh.position.x = node.position.x;
                     node.mesh.position.z = node.position.z;
-                    // node.mesh.position.y is handled by glide logic above
                     node.mesh.visible = true;
                 }
             });
 
+            // --- InstancedMesh update ---
+            if (this.instancedMesh) {
+                let anyVisible = false;
+                this.nodes.forEach((node, i) => {
+                    if (node.isPlaced && node.mesh /* && !node.useCroppedImage */) {
+                        const m = new THREE.Matrix4().setPosition(node.position);
+                        this.instancedMesh.setMatrixAt(i, m);
+                        this.instancedMesh.setColorAt(i, new THREE.Color(node.config.nodeColor));
+                        anyVisible = true;
+                    } else {
+                        // Move offscreen if not visible or using sprite
+                        const m = new THREE.Matrix4().makeTranslation(9999, 9999, 9999);
+                        this.instancedMesh.setMatrixAt(i, m);
+                    }
+                });
+                this.instancedMesh.instanceMatrix.needsUpdate = true;
+                if (this.instancedMesh.instanceColor) this.instancedMesh.instanceColor.needsUpdate = true;
+                this.instancedMesh.visible = anyVisible;
+            }
+
             // Animate lines to follow node positions
             this.updateAnimatedConnections();
 
-            // Render scene
+            // Render scene (only here!)
             if (this.composer) {
                 this.composer.render();
             } else {
                 this.renderer.render(this.scene, this.camera);
             }
+
+            // --- Node label update ---
+            if (this.needsLabelUpdate && this.nodeLabelsContainer) {
+                this.updateNodeLabels(this.camera, this.renderer);
+            }
+
             this.iter++;
             requestAnimationFrame(animateIteration);
         };
@@ -412,18 +429,19 @@ class Visualizer {
         this._resumePhysics();
     }
 
-    applyLayerTension(layers) {
+    applyLayerTension(layers, nodeMap) {
         // Flatten all placed nodes for easy lookup
         const allNodes = layers.flat();
         allNodes.forEach(childNode => {
             if (!childNode.isPlaced) return;
             const parentKey = childNode.data.parent;
             if (!parentKey) return;
-            const parentNode = allNodes.find(n => n.data.uniqueKey === parentKey && n.isPlaced);
-            if (!parentNode) return;
+            // Use nodeMap for O(1) lookup
+            const parentNode = nodeMap.get(parentKey);
+            if (!parentNode || !parentNode.isPlaced) return;
 
-            // Calculate direction from parent to child (XZ plane)
-            const direction = new THREE.Vector3().subVectors(childNode.position, parentNode.position);
+            // Use reusable temp vector for direction
+            const direction = this._tempVec1.subVectors(childNode.position, parentNode.position);
             direction.y = 0;
             const distance = direction.length();
             if (distance > 0) {
@@ -432,68 +450,70 @@ class Visualizer {
                 const tension = parentNode.data.name === this.config.rootNodeName
                     ? this.config.firstLayerTension
                     : this.config.layerTension;
-                const force = direction.multiplyScalar(tension * distance * 0.1);
+                // Clone direction before multiplying to avoid mutating the temp vector for other uses
+                const force = direction.clone().multiplyScalar(tension * distance * 0.1);
                 parentNode.force.sub(force);
                 childNode.force.add(force);
             }
         });
     }
 
-    applySameLayerRepulsion(layers) {
+    applySameLayerRepulsion(layers, nodeMap) {
         layers.forEach(layer => {
+            // Build quadtree for this layer
+            if (layer.length < 2) return;
+            // Compute bounds
+            let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+            layer.forEach(node => {
+                minX = Math.min(minX, node.position.x);
+                maxX = Math.max(maxX, node.position.x);
+                minZ = Math.min(minZ, node.position.z);
+                maxZ = Math.max(maxZ, node.position.z);
+            });
+            const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+            const w = (maxX - minX) / 2 + 2, h = (maxZ - minZ) / 2 + 2;
+            const qt = new Quadtree({ x: cx, z: cz, w, h }, 8);
+            layer.forEach(node => qt.insert(node));
+
             for (let i = 0; i < layer.length; i++) {
                 const nodeA = layer[i];
-                const neighbors = [];
-                for (let j = 0; j < layer.length; j++) {
-                    if (i === j) continue;
-                    const nodeB = layer[j];
-                    const direction = new THREE.Vector3().subVectors(nodeA.position, nodeB.position);
+                // Query neighbors within a radius (e.g., 10 units)
+                const neighbors = qt.query({ x: nodeA.position.x, z: nodeA.position.z, w: this.config.repulsionRadius, h: this.config.repulsionRadius });
+                for (const nodeB of neighbors) {
+                    if (nodeA === nodeB) continue;
+                    // Use temp vector for calculation, but clone before using in force
+                    const direction = this._tempVec2.subVectors(nodeA.position, nodeB.position);
                     direction.y = 0;
                     const distance = direction.length();
                     if (distance > 0 && distance < 10) {
-                        neighbors.push({ node: nodeB, direction, distance });
+                        direction.normalize();
+                        let repulsionForceValue = this.config.nodeRepulsion;
+                        const parentA = nodeA.data.parent;
+                        const parentB = nodeB.data.parent;
+                        const sharedParent = parentA && parentB && parentA === parentB && parentA !== null;
+                        const parentNodeA = this.nodes.find(n => n.data.uniqueKey === parentA);
+                        if (parentNodeA && parentNodeA.data.name === this.config.rootNodeName) {
+                            repulsionForceValue = this.config.firstLayerRepulsion;
+                            const repulsionForce = repulsionForceValue / (distance * distance);
+                            const force = direction.clone().multiplyScalar(repulsionForce);
+                            nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                            nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                        } else if (sharedParent && parentA !== null && parentA !== undefined) {
+                            const springLength = this.config.sameParentSpringLength ?? 2.0;
+                            const k = this.config.sameParentRepulsion;
+                            const displacement = distance - springLength;
+                            const forceMagnitude = -k * displacement;
+                            const force = direction.clone().multiplyScalar(forceMagnitude);
+                            nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                            nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                        } else {
+                            const repulsionForce = repulsionForceValue / (distance * distance);
+                            const force = direction.clone().multiplyScalar(repulsionForce);
+                            nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                            nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
+                        }
                     }
                 }
-                neighbors.sort((a, b) => a.distance - b.distance);
-                const closest = neighbors;
-                closest.forEach(({ node: nodeB, direction, distance }) => {
-                    direction.normalize();
-
-                    // --- Use sameParentRepulsion if nodes share a parent ---
-                    let repulsionForceValue = this.config.nodeRepulsion;
-                    // Find if nodeA and nodeB share a parent (using uniqueKey only)
-                    const parentA = nodeA.data.parent;
-                    const parentB = nodeB.data.parent;
-                    const sharedParent = parentA && parentB && parentA === parentB && parentA !== null;
-
-                    // Hooke's law for nodes with shared parent
-                    // Prioritize being in first layer over sharedParent
-                    const parentNodeA = this.nodes.find(n => n.data.uniqueKey === parentA);
-                    if (parentNodeA && parentNodeA.data.name === this.config.rootNodeName) {
-                        // First layer repulsion takes priority
-                        repulsionForceValue = this.config.firstLayerRepulsion;
-                        const repulsionForce = repulsionForceValue / (distance * distance);
-                        const force = direction.multiplyScalar(repulsionForce);
-                        nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
-                        nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
-                    } else if (sharedParent && parentA !== null && parentA !== undefined) {
-                        // Configurable spring length and constant
-                        const springLength = this.config.sameParentSpringLength ?? 2.0; // default 2.0 units
-                        const k = this.config.sameParentRepulsion; // spring constant
-                        // F = -k * (x - L)
-                        const displacement = distance - springLength;
-                        const forceMagnitude = -k * displacement;
-                        const force = direction.clone().multiplyScalar(forceMagnitude);
-                        nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
-                        nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
-                    } else {
-                        // Default repulsion
-                        const repulsionForce = repulsionForceValue / (distance * distance);
-                        const force = direction.multiplyScalar(repulsionForce);
-                        nodeA.force.add(force.clamp(this.clampVectorMin, this.clampVectorMax));
-                        nodeB.force.sub(force.clamp(this.clampVectorMin, this.clampVectorMax));
-                    }
-                });
             }
         });
     }
@@ -575,7 +595,6 @@ class Visualizer {
                 newEnd.x, newEnd.y, newEnd.z
             ]);
             material.opacity = progress;
-            material.needsUpdate = true;
         }
         // Ensure final state
         geometry.setPositions([
@@ -583,7 +602,6 @@ class Visualizer {
             childNode.position.x, childNode.position.y, childNode.position.z
         ]);
         material.opacity = 1.0;
-        material.needsUpdate = true;
     }
 
     updateAnimatedConnections() {
@@ -602,6 +620,41 @@ class Visualizer {
     }
 
     // --- End Animated Connections ---
+
+    // --- Node label overlay logic ---
+    setLabelContainer(container) {
+        this.nodeLabelsContainer = container;
+        this.showNodeLabels = false;
+        this.needsLabelUpdate = true;
+    }
+
+    toggleNodeLabels(show) {
+        this.showNodeLabels = show;
+        if (this.nodeLabelsContainer) {
+            this.nodeLabelsContainer.style.display = show ? "block" : "none";
+        }
+        this.needsLabelUpdate = true;
+    }
+
+    updateNodeLabels(camera, renderer) {
+        if (!this.showNodeLabels || !this.nodeLabelsContainer) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        this.nodeLabelsContainer.innerHTML = '';
+        this.nodes.forEach(node => {
+            if (!node.isPlaced) return;
+            const pos = node.position.clone();
+            pos.project(camera);
+            const x = (pos.x * 0.5 + 0.5) * rect.width + rect.left;
+            const y = (-pos.y * 0.5 + 0.5) * rect.height + rect.top;
+            const label = document.createElement('div');
+            label.className = 'node-label';
+            label.textContent = node.data.name;
+            label.style.left = `${x}px`;
+            label.style.top = `${y - 18}px`;
+            this.nodeLabelsContainer.appendChild(label);
+        });
+        this.needsLabelUpdate = false;
+    }
 
     updateConfig(newConfig) {
         this.config = { ...this.config, ...newConfig };
@@ -627,10 +680,11 @@ class Visualizer {
             });
             this.animatedConnections = [];
         }
-        this.connections.forEach(connection => {
-            this.scene.remove(connection);
-        });
-        this.connections = [];
+        // Remove InstancedMesh
+        if (this.instancedMesh) {
+            this.scene.remove(this.instancedMesh);
+            this.instancedMesh = null;
+        }
     }
 
     // 1. Return all node meshes for raycasting
@@ -666,9 +720,13 @@ class Visualizer {
             mesh.userData.originalColor = mesh.material.color.clone();
         }
         if (isHovered) {
-            mesh.material.color.set(this.config.color_hover);
+            if (!mesh.material.color.equals(new THREE.Color(this.config.color_hover))) {
+                mesh.material.color.set(this.config.color_hover);
+            }
         } else {
-            mesh.material.color.copy(mesh.userData.originalColor);
+            if (!mesh.material.color.equals(mesh.userData.originalColor)) {
+                mesh.material.color.copy(mesh.userData.originalColor);
+            }
         }
     }
 
@@ -721,6 +779,45 @@ class Visualizer {
             }
         });
     }
+
+    // Helper: Get interpolated color for a layer index
+    getLayerColor(layerIndex, layerCount) {
+        if (layerCount === 1) {
+            return new THREE.Color(this.config.color_initial);
+        } else if (layerIndex <= (layerCount - 1) / 2) {
+            // Interpolate color_initial to color_mid
+            const t = layerIndex / ((layerCount - 1) / 2);
+            return this.interpolateColor(
+                new THREE.Color(this.config.color_initial),
+                new THREE.Color(this.config.color_mid),
+                t
+            );
+        } else {
+            // Interpolate color_mid to color_final
+            const t = (layerIndex - (layerCount - 1) / 2) / ((layerCount - 1) / 2);
+            return this.interpolateColor(
+                new THREE.Color(this.config.color_mid),
+                new THREE.Color(this.config.color_final),
+                t
+            );
+        }
+    }
+
+    // Helper: Assign colors to all layers
+    assignLayerColors(layers) {
+        const layerCount = layers.length;
+        layers.forEach((layer, i) => {
+            const color = this.getLayerColor(i, layerCount);
+            layer.forEach(node => {
+                node.data._layerColor = color;
+                node.config = { ...node.config, nodeColor: color.getHex() };
+                if (node.data.nodetype === "prc") {
+                    node.config.nodeColor = this.config.color_prc;
+                }
+            });
+        });
+    }
+
 }
 
 export { Visualizer };
