@@ -5,6 +5,8 @@ import { Quadtree } from './quadtree.js';
 import { Line2 } from 'three/examples/jsm/lines/Line2.js';
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
+import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 
 class Visualizer {
 
@@ -69,8 +71,8 @@ class Visualizer {
             },
             linktypeWidths: { // Add this for per-linktype linewidths
                 UFO: 1,
-                Alpha: 2,
-                Outreach: 2,
+                Alpha: 1,
+                Outreach: 1,
                 default: 1
             },
             physicsThrottle: 1, // <--- Add this: recalc physics every N frames (default: 1 = every frame)
@@ -522,101 +524,244 @@ class Visualizer {
     // --- Animated Connections ---
 
     async createAnimatedConnections(data, nodeMap) {
-        this.animatedConnections = [];
-        const promises = [];
+        // Remove previous batched lines if any
+        if (this.batchedLines) {
+            this.scene.remove(this.batchedLines);
+            this.batchedLines.geometry.dispose();
+            this.batchedLines.material.dispose();
+            this.batchedLines = null;
+        }
+        if (this.batchedThinLines) {
+            this.scene.remove(this.batchedThinLines);
+            this.batchedThinLines.geometry.dispose();
+            this.batchedThinLines.material.dispose();
+            this.batchedThinLines = null;
+        }
+
+        // Collect all connections
+        const fatPositions = [];
+        const fatColors = [];
+        const fatConnections = [];
+
+        const thinPositions = [];
+        const thinColors = [];
+        const thinConnections = [];
+
         data.forEach(person => {
             if (person.parent) {
                 const parentNode = nodeMap.get(person.parent);
                 const childNode = nodeMap.get(person.uniqueKey);
                 if (parentNode && childNode) {
-                    promises.push(this.animateConnection(parentNode, childNode));
+                    let lineColor = this.config.color_line;
+                    if (childNode.data.linktype && this.config.linktypeColors[childNode.data.linktype]) {
+                        lineColor = this.config.linktypeColors[childNode.data.linktype];
+                    } else if (this.config.linktypeColors.default) {
+                        lineColor = this.config.linktypeColors.default;
+                    }
+                    let lineWidth = 2;
+                    if (childNode.data.linktype && this.config.linktypeWidths[childNode.data.linktype]) {
+                        lineWidth = this.config.linktypeWidths[childNode.data.linktype];
+                    } else if (this.config.linktypeWidths.default) {
+                        lineWidth = this.config.linktypeWidths.default;
+                    }
+                    const color = new THREE.Color(lineColor);
+                    if (lineWidth > 1) {
+                        fatConnections.push({ parentNode, childNode });
+                        fatPositions.push(
+                            parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                            parentNode.position.x, parentNode.position.y, parentNode.position.z
+                        );
+                        fatColors.push(
+                            color.r, color.g, color.b,
+                            color.r, color.g, color.b
+                        );
+                    } else {
+                        thinConnections.push({ parentNode, childNode });
+                        thinPositions.push(
+                            parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                            parentNode.position.x, parentNode.position.y, parentNode.position.z
+                        );
+                        thinColors.push(
+                            color.r, color.g, color.b,
+                            color.r, color.g, color.b
+                        );
+                    }
                 }
             }
         });
-        await Promise.all(promises);
-    }
 
-    async animateConnection(parentNode, childNode) {
-        // Use Line2 for fat lines
-        const start = parentNode.position.clone();
-        const end = parentNode.position.clone(); // start as a zero-length line
+        // --- Fat lines ---
+        if (fatPositions.length > 0) {
+            const fatGeometry = new LineSegmentsGeometry();
+            fatGeometry.setPositions(fatPositions);
+            fatGeometry.setColors(fatColors);
 
-        // LineGeometry expects flat arrays
-        const positions = [
-            start.x, start.y, start.z,
-            end.x, end.y, end.z
-        ];
+            const fatMaterial = new LineMaterial({
+                color: 0xffffff,
+                linewidth: 2,
+                vertexColors: true,
+                transparent: true,
+                opacity: 1.0,
+                resolution: new THREE.Vector2(window.innerWidth, window.innerHeight)
+            });
 
-        const geometry = new LineGeometry();
-        geometry.setPositions(positions);
-
-        // Determine line color by linktype
-        let lineColor = this.config.color_line;
-        if (childNode.data.linktype && this.config.linktypeColors[childNode.data.linktype]) {
-            lineColor = this.config.linktypeColors[childNode.data.linktype];
-        } else if (this.config.linktypeColors.default) {
-            lineColor = this.config.linktypeColors.default;
+            const fatLines = new LineSegments2(fatGeometry, fatMaterial);
+            fatLines.computeLineDistances();
+            fatLines.scale.set(1, 1, 1);
+            this.scene.add(fatLines);
+            this.batchedLines = fatLines;
+            this.batchedConnections = fatConnections;
+            this.batchedLinesGeometry = fatGeometry;
+            this.batchedLinesMaterial = fatMaterial;
+        } else {
+            this.batchedLines = null;
+            this.batchedConnections = [];
+            this.batchedLinesGeometry = null;
+            this.batchedLinesMaterial = null;
         }
 
-        // Determine line width by linktype
-        let lineWidth = 2;
-        if (childNode.data.linktype && this.config.linktypeWidths[childNode.data.linktype]) {
-            lineWidth = this.config.linktypeWidths[childNode.data.linktype];
-        } else if (this.config.linktypeWidths.default) {
-            lineWidth = this.config.linktypeWidths.default;
+        // --- Thin lines ---
+        if (thinPositions.length > 0) {
+            const thinGeometry = new LineSegmentsGeometry();
+            thinGeometry.setPositions(thinPositions);
+            thinGeometry.setColors(thinColors);
+
+            const thinMaterial = new LineMaterial({
+                color: 0xffffff,
+                linewidth: 1,
+                vertexColors: true,
+                transparent: true,
+                opacity: 1.0,
+                resolution: new THREE.Vector2(window.innerWidth, window.innerHeight)
+            });
+
+            const thinLines = new LineSegments2(thinGeometry, thinMaterial);
+            thinLines.computeLineDistances();
+            thinLines.scale.set(1, 1, 1);
+            this.scene.add(thinLines);
+            this.batchedThinLines = thinLines;
+            this.batchedThinConnections = thinConnections;
+            this.batchedThinLinesGeometry = thinGeometry;
+            this.batchedThinLinesMaterial = thinMaterial;
+        } else {
+            this.batchedThinLines = null;
+            this.batchedThinConnections = [];
+            this.batchedThinLinesGeometry = null;
+            this.batchedThinLinesMaterial = null;
         }
 
-        const material = new LineMaterial({
-            color: lineColor,
-            linewidth: lineWidth, // in world units
-            transparent: true,
-            opacity: 0.0,
-            // resolution is required for LineMaterial
-            resolution: new THREE.Vector2(window.innerWidth, window.innerHeight)
-        });
-
-        const line = new Line2(geometry, material);
-        line.computeLineDistances();
-        line.scale.set(1, 1, 1);
-        this.scene.add(line);
-        this.animatedConnections.push({ line, parentNode, childNode, geometry, material });
-
-        // Animate opacity and length
-        let progress = 0;
-        const duration = 400; // ms
-        const steps = 30;
+        // Animate lines in
+        const steps = 60;
+        const duration = 400;
         for (let i = 0; i <= steps; i++) {
             await new Promise(res => setTimeout(res, duration / steps));
-            progress = i / steps;
-            // Interpolate endpoint
-            const newEnd = parentNode.position.clone().lerp(childNode.position, progress);
-            geometry.setPositions([
-                parentNode.position.x, parentNode.position.y, parentNode.position.z,
-                newEnd.x, newEnd.y, newEnd.z
-            ]);
-            material.opacity = progress;
+            const progress = i / steps;
+            // Fat lines
+            if (this.batchedLines && this.batchedConnections) {
+                for (let j = 0; j < this.batchedConnections.length; j++) {
+                    const { parentNode, childNode } = this.batchedConnections[j];
+                    const newEnd = parentNode.position.clone().lerp(childNode.position, progress);
+                    fatPositions[j * 6 + 0] = parentNode.position.x;
+                    fatPositions[j * 6 + 1] = parentNode.position.y;
+                    fatPositions[j * 6 + 2] = parentNode.position.z;
+                    fatPositions[j * 6 + 3] = newEnd.x;
+                    fatPositions[j * 6 + 4] = newEnd.y;
+                    fatPositions[j * 6 + 5] = newEnd.z;
+                }
+                this.batchedLinesGeometry.setPositions(fatPositions);
+                this.batchedLinesMaterial.opacity = progress;
+            }
+            // Thin lines
+            if (this.batchedThinLines && this.batchedThinConnections) {
+                for (let j = 0; j < this.batchedThinConnections.length; j++) {
+                    const { parentNode, childNode } = this.batchedThinConnections[j];
+                    const newEnd = parentNode.position.clone().lerp(childNode.position, progress);
+                    thinPositions[j * 6 + 0] = parentNode.position.x;
+                    thinPositions[j * 6 + 1] = parentNode.position.y;
+                    thinPositions[j * 6 + 2] = parentNode.position.z;
+                    thinPositions[j * 6 + 3] = newEnd.x;
+                    thinPositions[j * 6 + 4] = newEnd.y;
+                    thinPositions[j * 6 + 5] = newEnd.z;
+                }
+                this.batchedThinLinesGeometry.setPositions(thinPositions);
+                this.batchedThinLinesMaterial.opacity = progress;
+            }
         }
         // Ensure final state
-        geometry.setPositions([
-            parentNode.position.x, parentNode.position.y, parentNode.position.z,
-            childNode.position.x, childNode.position.y, childNode.position.z
-        ]);
-        material.opacity = 1.0;
+        if (this.batchedLines && this.batchedConnections) {
+            for (let j = 0; j < this.batchedConnections.length; j++) {
+                const { parentNode, childNode } = this.batchedConnections[j];
+                fatPositions[j * 6 + 0] = parentNode.position.x;
+                fatPositions[j * 6 + 1] = parentNode.position.y;
+                fatPositions[j * 6 + 2] = parentNode.position.z;
+                fatPositions[j * 6 + 3] = childNode.position.x;
+                fatPositions[j * 6 + 4] = childNode.position.y;
+                fatPositions[j * 6 + 5] = childNode.position.z;
+            }
+            this.batchedLinesGeometry.setPositions(fatPositions);
+            this.batchedLinesMaterial.opacity = 1.0;
+        }
+        if (this.batchedThinLines && this.batchedThinConnections) {
+            for (let j = 0; j < this.batchedThinConnections.length; j++) {
+                const { parentNode, childNode } = this.batchedThinConnections[j];
+                thinPositions[j * 6 + 0] = parentNode.position.x;
+                thinPositions[j * 6 + 1] = parentNode.position.y;
+                thinPositions[j * 6 + 2] = parentNode.position.z;
+                thinPositions[j * 6 + 3] = childNode.position.x;
+                thinPositions[j * 6 + 4] = childNode.position.y;
+                thinPositions[j * 6 + 5] = childNode.position.z;
+            }
+            this.batchedThinLinesGeometry.setPositions(thinPositions);
+            this.batchedThinLinesMaterial.opacity = 1.0;
+        }
     }
 
     updateAnimatedConnections() {
-        if (!this.animatedConnections) return;
-        this.animatedConnections.forEach(({ line, parentNode, childNode, geometry }) => {
-            if (parentNode.isPlaced && childNode.isPlaced) {
-                geometry.setPositions([
+        // Update batched fat lines
+        if (this.batchedLines && this.batchedConnections) {
+            const positions = [];
+            for (let j = 0; j < this.batchedConnections.length; j++) {
+                const { parentNode, childNode } = this.batchedConnections[j];
+                positions.push(
                     parentNode.position.x, parentNode.position.y, parentNode.position.z,
                     childNode.position.x, childNode.position.y, childNode.position.z
-                ]);
-                line.visible = true;
-            } else {
-                line.visible = false;
+                );
             }
-        });
+            this.batchedLinesGeometry.setPositions(positions);
+        }
+        // Update batched thin lines
+        if (this.batchedThinLines && this.batchedThinConnections) {
+            const positions = [];
+            for (let j = 0; j < this.batchedThinConnections.length; j++) {
+                const { parentNode, childNode } = this.batchedThinConnections[j];
+                positions.push(
+                    parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                    childNode.position.x, childNode.position.y, childNode.position.z
+                );
+            }
+            this.batchedThinLinesGeometry.setPositions(positions);
+        }
+        // Legacy support (if needed)
+        if (this.animatedConnections) {
+            this.animatedConnections.forEach(({ line, parentNode, childNode, geometry, material }) => {
+                if (parentNode.isPlaced && childNode.isPlaced) {
+                    if (line.isLine2) {
+                        geometry.setPositions([
+                            parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                            childNode.position.x, childNode.position.y, childNode.position.z
+                        ]);
+                    } else {
+                        geometry.setFromPoints([
+                            parentNode.position.clone(),
+                            childNode.position.clone()
+                        ]);
+                    }
+                    line.visible = true;
+                } else {
+                    line.visible = false;
+                }
+            });
+        }
     }
 
     // --- End Animated Connections ---
