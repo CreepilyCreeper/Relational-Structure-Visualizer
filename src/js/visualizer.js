@@ -71,8 +71,8 @@ class Visualizer {
             },
             linktypeWidths: { // Add this for per-linktype linewidths
                 UFO: 1,
-                Alpha: 1,
-                Outreach: 1,
+                Alpha: 1.5,
+                Outreach: 1.5,
                 default: 1
             },
             physicsThrottle: 1, // <--- Add this: recalc physics every N frames (default: 1 = every frame)
