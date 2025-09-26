@@ -4,7 +4,7 @@ let sheetName = '';
 let url = '';
 
 async function loadConfig() {
-    const response = await fetch('../../config.json');
+    const response = await fetch('../../site_config.json');
     const config = await response.json();
     sheetId = config.sheetId;
     sheetName = config.sheetName;

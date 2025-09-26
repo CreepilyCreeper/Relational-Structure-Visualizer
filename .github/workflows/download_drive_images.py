@@ -5,7 +5,7 @@ import mimetypes
 import json
 import shutil
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config.json')
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'site_config.json')
 with open(CONFIG_PATH, 'r') as f:
     config = json.load(f)
 SHEET_URL = f"https://opensheet.elk.sh/{config['sheetId']}/{config['sheetName']}"
