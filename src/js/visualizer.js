@@ -567,20 +567,35 @@ class Visualizer {
                     const color = new THREE.Color(lineColor);
                     if (lineWidth > 1) {
                         fatConnections.push({ parentNode, childNode });
-                        fatPositions.push(
-                            parentNode.position.x, parentNode.position.y, parentNode.position.z,
-                            parentNode.position.x, parentNode.position.y, parentNode.position.z
-                        );
+                        // If childNode is not placed, make the line zero-length at parent
+                        if (!childNode.isPlaced) {
+                            fatPositions.push(
+                                parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                                parentNode.position.x, parentNode.position.y, parentNode.position.z
+                            );
+                        } else {
+                            fatPositions.push(
+                                parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                                childNode.position.x, childNode.position.y, childNode.position.z
+                            );
+                        }
                         fatColors.push(
                             color.r, color.g, color.b,
                             color.r, color.g, color.b
                         );
                     } else {
                         thinConnections.push({ parentNode, childNode });
-                        thinPositions.push(
-                            parentNode.position.x, parentNode.position.y, parentNode.position.z,
-                            parentNode.position.x, parentNode.position.y, parentNode.position.z
-                        );
+                        if (!childNode.isPlaced) {
+                            thinPositions.push(
+                                parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                                parentNode.position.x, parentNode.position.y, parentNode.position.z
+                            );
+                        } else {
+                            thinPositions.push(
+                                parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                                childNode.position.x, childNode.position.y, childNode.position.z
+                            );
+                        }
                         thinColors.push(
                             color.r, color.g, color.b,
                             color.r, color.g, color.b
@@ -722,10 +737,18 @@ class Visualizer {
             const positions = [];
             for (let j = 0; j < this.batchedConnections.length; j++) {
                 const { parentNode, childNode } = this.batchedConnections[j];
-                positions.push(
-                    parentNode.position.x, parentNode.position.y, parentNode.position.z,
-                    childNode.position.x, childNode.position.y, childNode.position.z
-                );
+                if (!childNode.isPlaced) {
+                    // Zero-length line at parent
+                    positions.push(
+                        parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                        parentNode.position.x, parentNode.position.y, parentNode.position.z
+                    );
+                } else {
+                    positions.push(
+                        parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                        childNode.position.x, childNode.position.y, childNode.position.z
+                    );
+                }
             }
             this.batchedLinesGeometry.setPositions(positions);
         }
@@ -734,10 +757,17 @@ class Visualizer {
             const positions = [];
             for (let j = 0; j < this.batchedThinConnections.length; j++) {
                 const { parentNode, childNode } = this.batchedThinConnections[j];
-                positions.push(
-                    parentNode.position.x, parentNode.position.y, parentNode.position.z,
-                    childNode.position.x, childNode.position.y, childNode.position.z
-                );
+                if (!childNode.isPlaced) {
+                    positions.push(
+                        parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                        parentNode.position.x, parentNode.position.y, parentNode.position.z
+                    );
+                } else {
+                    positions.push(
+                        parentNode.position.x, parentNode.position.y, parentNode.position.z,
+                        childNode.position.x, childNode.position.y, childNode.position.z
+                    );
+                }
             }
             this.batchedThinLinesGeometry.setPositions(positions);
         }
