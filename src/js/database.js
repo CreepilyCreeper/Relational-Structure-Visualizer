@@ -4,7 +4,19 @@ let sheetName = '';
 let url = '';
 
 async function loadConfig() {
-    const response = await fetch('../../site_config.json');
+    // Dynamically determine the repo name from the URL path for GitHub Pages
+    let repoName = '';
+    if (location.hostname.endsWith('github.io')) {
+        // e.g. https://username.github.io/repo-name/
+        const pathParts = location.pathname.split('/').filter(Boolean);
+        repoName = pathParts.length > 0 ? pathParts[0] : '';
+    }
+    let configPath = repoName ? `/${repoName}/site_config.json` : '/site_config.json';
+    // If running locally (file:// or localhost), use relative path
+    if (location.hostname === 'localhost' || location.protocol === 'file:') {
+        configPath = '../../site_config.json';
+    }
+    const response = await fetch(configPath);
     const config = await response.json();
     sheetId = config.sheetId;
     sheetName = config.sheetName;
