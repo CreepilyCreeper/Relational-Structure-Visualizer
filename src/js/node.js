@@ -52,15 +52,18 @@ class Node {
 
         // --- Add Sprite for Cropped Image with fallback ---
         if (this.data.selfiecropped && this.data.uniqueKey) {
-            const fallbackTexture = new THREE.TextureLoader().load('./assets/selfiescropped/fallback_CROPPED.jpg');
-            const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
-            this.sprite = new THREE.Sprite(spriteMaterial);
-            this.sprite.renderOrder = 999;
-            const initialScale = (this.useCroppedImage ? this.spriteScale : 0);
-            this.sprite.scale.set(this.originalScale * initialScale, this.originalScale * initialScale, 1);
-            this.sprite.center.set(0.5, 0.5);
-            this.sprite.visible = this.useCroppedImage;
-            this.mesh.add(this.sprite);
+        const fallbackTexture = new THREE.TextureLoader().load('./assets/selfiescropped/fallback_CROPPED.jpg');
+        const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
+        this.sprite = new THREE.Sprite(spriteMaterial);
+        this.sprite.renderOrder = 999;
+        const initialScale = (this.useCroppedImage ? this.spriteScale : 0);
+        this.sprite.scale.set(this.originalScale * initialScale, this.originalScale * initialScale, 1);
+        this.sprite.center.set(0.5, 0.5);
+        this.sprite.visible = this.useCroppedImage;
+        // Put sprites on a non-bloom layer so postprocessing bloom doesn't affect them
+        // Layer index 1 is reserved for non-bloom (sprites)
+        this.sprite.layers.set(1);
+        this.mesh.add(this.sprite);
 
             // Add user data to sprite for interactions
             this.sprite.userData = {

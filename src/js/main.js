@@ -387,6 +387,28 @@ if (visualizerConfig.bloom) {
     };
 }
 
+// Create a dedicated composer for bloom so we can render bloom only for specific layers
+let bloomComposer = null;
+if (visualizerConfig.bloom) {
+    bloomComposer = new EffectComposer(renderer, renderTarget);
+    const renderPass = new RenderPass(scene, camera);
+    bloomComposer.addPass(renderPass);
+
+    const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        visualizerConfig.bloomStrength,
+        visualizerConfig.bloomRadius,
+        visualizerConfig.bloomThreshold
+    );
+    bloomComposer.addPass(bloomPass);
+} else {
+    bloomComposer = { render: () => renderer.render(scene, camera), setSize: (w,h)=>renderer.setSize(w,h) };
+}
+
+// Layer constants: layer 0 = bloom-eligible (default), layer 1 = non-bloom (sprites)
+window.BLOOM_LAYER = 0;
+window.NON_BLOOM_LAYER = 1;
+window.bloomComposer = bloomComposer;
 // Initialize visualizer with custom config
 const visualizer = new Visualizer(scene, camera, renderer, composer);
 visualizer.updateConfig(visualizerConfig);

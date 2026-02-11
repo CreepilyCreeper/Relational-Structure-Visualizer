@@ -132,7 +132,8 @@ class Visualizer {
         // Create nodes first and add to scene immediately
         data.forEach(person => {
             const node = new Node(person, this.config);
-            // node.useCroppedImage = this.useCroppedImages; // REMOVE THIS LINE
+            // Ensure each node knows the current cropped-image setting before createNode() runs
+            node.useCroppedImage = this.useCroppedImages;
             nodeMap.set(person.uniqueKey, node);
             this.nodes.push(node);
         });
@@ -409,8 +410,32 @@ class Visualizer {
             this.updateAnimatedConnections();
 
             // Render scene (only here!)
-            if (this.composer) {
-                this.composer.render();
+            // If a bloom composer is provided, render bloom-only for the bloom layer,
+            // then render base and finally render sprites (non-bloom layer) on top.
+            if (window.bloomComposer && window.BLOOM_LAYER !== undefined) {
+                const renderer = this.renderer;
+                const camera = this.camera;
+                const scene = this.scene;
+                const BLOOM_LAYER = window.BLOOM_LAYER;
+                const NON_BLOOM_LAYER = window.NON_BLOOM_LAYER || 1;
+
+                renderer.autoClear = false;
+                renderer.clear();
+
+                // Render bloom contribution for bloom layer only
+                camera.layers.set(BLOOM_LAYER);
+                window.bloomComposer.render();
+
+                // Draw scene base for bloom layer (colors)
+                renderer.clearDepth();
+                camera.layers.set(BLOOM_LAYER);
+                renderer.render(scene, camera);
+
+                // Draw sprites / non-bloom objects on top
+                camera.layers.set(NON_BLOOM_LAYER);
+                renderer.render(scene, camera);
+
+                renderer.autoClear = true;
             } else {
                 this.renderer.render(this.scene, this.camera);
             }
