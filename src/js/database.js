@@ -27,32 +27,66 @@ await loadConfig();
 const selfieDir = './assets/selfies/';
 const fallbackSelfie = 'fallback.png';
 
-// List of common image extensions to check
+// Default extension to try first (most common format)
+const defaultExtension = '.jpg';
+
+// List of image extensions to check (for lazy discovery)
 const commonExtensions = [
     '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.ico', '.heic'
 ];
 
 /**
- * Asynchronously finds the first existing selfie image for a member.
- * @param {string} name - The member's name (used as the filename).
- * @returns {Promise<string>} - The path to the found selfie image or the fallback.
+ * Returns a default selfie path without checking if it exists.
+ * The UI should handle 404s gracefully with fallback images.
+ * @param {string} name - The member's name
+ * @returns {string} - Default path to try
  */
-const findSelfiePath = async (name) => {
-    for (const ext of commonExtensions) {
-        // Allow Unicode (including Chinese) in filenames, only replace illegal file chars
-        const safeName = name.replace(/[\/\\:*?"<>|]/g, '_');
-        const potentialPath = selfieDir + safeName + ext;
-        try {
-            const response = await fetch(potentialPath, { method: 'HEAD' });
-            if (response.ok) {
-                return potentialPath;
-            }
-        } catch {
-            // Ignore errors and continue
-        }
+const getDefaultSelfiePath = (name) => {
+    const safeName = name.replace(/[\/\\:*?"<>|]/g, '_');
+    return selfieDir + safeName + defaultExtension;
+};
+
+/**
+ * Lazily discovers the actual selfie path (used only when displaying node detail).
+ * Caches results to avoid repeated lookups.
+ * @param {string} name - The member's name
+ * @param {function} callback - Called with the found path
+ */
+const selfiePathCache = new Map();
+const discoverSelfiePath = (name, callback) => {
+    if (selfiePathCache.has(name)) {
+        callback(selfiePathCache.get(name));
+        return;
     }
-    console.log(`Using fallback selfie for ${name}`);
-    return selfieDir + fallbackSelfie;
+    
+    const safeName = name.replace(/[\/\\:*?"<>|]/g, '_');
+    let extensionIndex = 0;
+    
+    const tryNext = () => {
+        if (extensionIndex >= commonExtensions.length) {
+            const fallback = selfieDir + fallbackSelfie;
+            selfiePathCache.set(name, fallback);
+            callback(fallback);
+            return;
+        }
+        
+        const ext = commonExtensions[extensionIndex];
+        const potentialPath = selfieDir + safeName + ext;
+        extensionIndex++;
+        
+        fetch(potentialPath, { method: 'HEAD' })
+            .then(response => {
+                if (response.ok) {
+                    selfiePathCache.set(name, potentialPath);
+                    callback(potentialPath);
+                } else {
+                    tryNext();
+                }
+            })
+            .catch(() => tryNext());
+    };
+    
+    tryNext();
 };
 
 // Derive selfieCroppedPath from selfiePath
@@ -87,12 +121,13 @@ const fetchData = async (useTestData = false) => {
         // Filter out rows with no name
         const filteredRows = rawRows.filter(row => row.name && row.name.trim());
 
-        // First, create all members with uniqueKey
-        const members = await Promise.all(filteredRows.map(async row => {
+        // First, create all members with uniqueKey (no blocking image discovery)
+        const members = filteredRows.map(row => {
             const name = row.name.trim();
             const joinDate = row.joinDate ? row.joinDate.trim() : '';
             const uniqueKey = `${name}__${joinDate}`;
-            const selfiePath = row.selfie ? row.selfie : await findSelfiePath(name);
+            // Use provided selfie path or default (no HEAD requests)
+            const selfiePath = row.selfie ? row.selfie : getDefaultSelfiePath(name);
             return {
                 uniqueKey,
                 name,
@@ -104,7 +139,7 @@ const fetchData = async (useTestData = false) => {
                 nodetype: row.nodetype ? row.nodetype.trim() : "",
                 testimonial: row.testimonial || ""
             };
-        }));
+        });
 
         // Build a lookup: name -> array of members with that name, sorted by joinDate ascending
         const nameLookup = {};
@@ -149,4 +184,4 @@ const fetchData = async (useTestData = false) => {
     }
 };
 
-export { fetchData };
+export { fetchData, discoverSelfiePath };

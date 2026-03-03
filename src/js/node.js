@@ -1,5 +1,42 @@
 import * as THREE from 'three';
 
+// Shared fallback texture (singleton) - loaded once and reused
+let sharedFallbackTexture = null;
+let fallbackTextureLoading = false;
+const fallbackTextureCallbacks = [];
+
+function getSharedFallbackTexture(callback) {
+    if (sharedFallbackTexture) {
+        callback(sharedFallbackTexture);
+        return;
+    }
+    fallbackTextureCallbacks.push(callback);
+    if (!fallbackTextureLoading) {
+        fallbackTextureLoading = true;
+        new THREE.TextureLoader().load(
+            './assets/selfiescropped/fallback_CROPPED.jpg',
+            (texture) => {
+                sharedFallbackTexture = texture;
+                fallbackTextureCallbacks.forEach(cb => cb(texture));
+                fallbackTextureCallbacks.length = 0;
+            },
+            undefined,
+            () => {
+                // On error, create a simple colored texture as fallback
+                const canvas = document.createElement('canvas');
+                canvas.width = 64;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#888888';
+                ctx.fillRect(0, 0, 64, 64);
+                sharedFallbackTexture = new THREE.CanvasTexture(canvas);
+                fallbackTextureCallbacks.forEach(cb => cb(sharedFallbackTexture));
+                fallbackTextureCallbacks.length = 0;
+            }
+        );
+    }
+}
+
 class Node {
     constructor(personData, config = {}) {
         this.data = personData;
@@ -16,7 +53,8 @@ class Node {
         this.spriteScale = 5;
     }
 
-    async createNode(allYears = null) {
+    // Synchronous node creation - textures load in background
+    createNode(allYears = null) {
         const geometry = new THREE.SphereGeometry(this.originalScale, 32, 32);
         const color = new THREE.Color(this.config.nodeColor);
         const material = new THREE.MeshBasicMaterial({
@@ -50,20 +88,20 @@ class Node {
             nodeInstance: this
         };
 
-        // --- Add Sprite for Cropped Image with fallback ---
+        // --- Add Sprite for Cropped Image with shared fallback ---
         if (this.data.selfiecropped && this.data.uniqueKey) {
-        const fallbackTexture = new THREE.TextureLoader().load('./assets/selfiescropped/fallback_CROPPED.jpg');
-        const spriteMaterial = new THREE.SpriteMaterial({ map: fallbackTexture, depthTest: false });
-        this.sprite = new THREE.Sprite(spriteMaterial);
-        this.sprite.renderOrder = 999;
-        const initialScale = (this.useCroppedImage ? this.spriteScale : 0);
-        this.sprite.scale.set(this.originalScale * initialScale, this.originalScale * initialScale, 1);
-        this.sprite.center.set(0.5, 0.5);
-        this.sprite.visible = this.useCroppedImage;
-        // Put sprites on a non-bloom layer so postprocessing bloom doesn't affect them
-        // Layer index 1 is reserved for non-bloom (sprites)
-        this.sprite.layers.set(1);
-        this.mesh.add(this.sprite);
+            // Create sprite with a temporary transparent material (texture loads async)
+            const spriteMaterial = new THREE.SpriteMaterial({ transparent: true, opacity: 0, depthTest: false });
+            this.sprite = new THREE.Sprite(spriteMaterial);
+            this.sprite.renderOrder = 999;
+            const initialScale = (this.useCroppedImage ? this.spriteScale : 0);
+            this.sprite.scale.set(this.originalScale * initialScale, this.originalScale * initialScale, 1);
+            this.sprite.center.set(0.5, 0.5);
+            this.sprite.visible = this.useCroppedImage;
+            // Put sprites on a non-bloom layer so postprocessing bloom doesn't affect them
+            // Layer index 1 is reserved for non-bloom (sprites)
+            this.sprite.layers.set(1);
+            this.mesh.add(this.sprite);
 
             // Add user data to sprite for interactions
             this.sprite.userData = {
@@ -77,16 +115,24 @@ class Node {
                 nodeInstance: this
             };
 
-            // Load the real image in the background
-            this.loadTexturePromise(this.data.selfiecropped)
-                .then(texture => {
-                    this.sprite.material.map = texture;
-                    this.sprite.material.needsUpdate = true;
-                })
-                .catch(() => {
-                    this.sprite.material.map = fallbackTexture;
-                    this.sprite.material.needsUpdate = true;
-                });
+            // Load shared fallback texture, then try to load the real image
+            getSharedFallbackTexture((fallbackTexture) => {
+                if (!this.sprite) return;
+                this.sprite.material.map = fallbackTexture;
+                this.sprite.material.opacity = 1;
+                this.sprite.material.needsUpdate = true;
+
+                // Load the real image in the background
+                this.loadTexturePromise(this.data.selfiecropped)
+                    .then(texture => {
+                        if (!this.sprite) return;
+                        this.sprite.material.map = texture;
+                        this.sprite.material.needsUpdate = true;
+                    })
+                    .catch(() => {
+                        // Keep using fallback
+                    });
+            });
         }
 
         return this.mesh;

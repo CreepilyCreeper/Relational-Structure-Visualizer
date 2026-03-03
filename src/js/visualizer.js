@@ -177,17 +177,6 @@ class Visualizer {
         // Initialize positions
         this.initializePositions(layers);
 
-        // Create meshes for all nodes and add to scene
-        for (const node of this.nodes) {
-            // node.useCroppedImage = this.useCroppedImages; // REMOVE THIS LINE
-            const mesh = await node.createNode(allYears);
-            mesh.position.copy(node.position);
-            mesh.scale.set(1, 1, 1);
-            mesh.visible = !!node.isPlaced;
-            this.scene.add(mesh);
-            node.mesh = mesh;
-        }
-
         // --- InstancedMesh optimization ---
         if (this.instancedMesh) {
             this.scene.remove(this.instancedMesh);
@@ -200,13 +189,23 @@ class Visualizer {
         this.scene.add(this.instancedMesh);
         this._instancedMeshNeedsUpdate = true;
 
-        // Draw all connections (animated)
-        await this.createAnimatedConnections(data, nodeMap);
-
-        // Start render loop with physics
+        // Start render loop with physics IMMEDIATELY (before mesh creation completes)
         if (!this.isAnimating) {
             this.startPhysicsRenderLoop(nodeMap);
         }
+
+        // Create meshes for all nodes synchronously (textures load async in background)
+        for (const node of this.nodes) {
+            const mesh = node.createNode(allYears); // No await - synchronous
+            mesh.position.copy(node.position);
+            mesh.scale.set(1, 1, 1);
+            mesh.visible = !!node.isPlaced;
+            this.scene.add(mesh);
+            node.mesh = mesh;
+        }
+
+        // Draw all connections (setup only, animation runs in render loop)
+        this.createAnimatedConnections(data, nodeMap);
 
         // Save nodeMap for later use if needed elsewhere
         this._nodeMap = nodeMap;
@@ -440,8 +439,8 @@ class Visualizer {
                 this.renderer.render(this.scene, this.camera);
             }
 
-            // --- Node label update ---
-            if (this.needsLabelUpdate && this.nodeLabelsContainer) {
+            // --- Node label update (every frame when visible) ---
+            if (this.showNodeLabels && this.nodeLabelsContainer) {
                 this.updateNodeLabels(this.camera, this.renderer);
             }
 
@@ -548,7 +547,7 @@ class Visualizer {
 
     // --- Animated Connections ---
 
-    async createAnimatedConnections(data, nodeMap) {
+    createAnimatedConnections(data, nodeMap) {
         // Remove previous batched lines if any
         if (this.batchedLines) {
             this.scene.remove(this.batchedLines);
@@ -690,12 +689,20 @@ class Visualizer {
             this.batchedThinLinesMaterial = null;
         }
 
-        // Animate lines in
+        // Start line fade-in animation (non-blocking, runs via requestAnimationFrame)
+        this._startLineFadeAnimation(fatPositions, thinPositions);
+    }
+
+    _startLineFadeAnimation(fatPositions, thinPositions) {
         const steps = 60;
         const duration = 400;
-        for (let i = 0; i <= steps; i++) {
-            await new Promise(res => setTimeout(res, duration / steps));
-            const progress = i / steps;
+        let currentStep = 0;
+        const startTime = performance.now();
+
+        const animateStep = () => {
+            const elapsed = performance.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
             // Fat lines
             if (this.batchedLines && this.batchedConnections) {
                 for (let j = 0; j < this.batchedConnections.length; j++) {
@@ -726,34 +733,41 @@ class Visualizer {
                 this.batchedThinLinesGeometry.setPositions(thinPositions);
                 this.batchedThinLinesMaterial.opacity = progress;
             }
-        }
-        // Ensure final state
-        if (this.batchedLines && this.batchedConnections) {
-            for (let j = 0; j < this.batchedConnections.length; j++) {
-                const { parentNode, childNode } = this.batchedConnections[j];
-                fatPositions[j * 6 + 0] = parentNode.position.x;
-                fatPositions[j * 6 + 1] = parentNode.position.y;
-                fatPositions[j * 6 + 2] = parentNode.position.z;
-                fatPositions[j * 6 + 3] = childNode.position.x;
-                fatPositions[j * 6 + 4] = childNode.position.y;
-                fatPositions[j * 6 + 5] = childNode.position.z;
+
+            if (progress < 1) {
+                requestAnimationFrame(animateStep);
+            } else {
+                // Ensure final state
+                if (this.batchedLines && this.batchedConnections) {
+                    for (let j = 0; j < this.batchedConnections.length; j++) {
+                        const { parentNode, childNode } = this.batchedConnections[j];
+                        fatPositions[j * 6 + 0] = parentNode.position.x;
+                        fatPositions[j * 6 + 1] = parentNode.position.y;
+                        fatPositions[j * 6 + 2] = parentNode.position.z;
+                        fatPositions[j * 6 + 3] = childNode.position.x;
+                        fatPositions[j * 6 + 4] = childNode.position.y;
+                        fatPositions[j * 6 + 5] = childNode.position.z;
+                    }
+                    this.batchedLinesGeometry.setPositions(fatPositions);
+                    this.batchedLinesMaterial.opacity = 1.0;
+                }
+                if (this.batchedThinLines && this.batchedThinConnections) {
+                    for (let j = 0; j < this.batchedThinConnections.length; j++) {
+                        const { parentNode, childNode } = this.batchedThinConnections[j];
+                        thinPositions[j * 6 + 0] = parentNode.position.x;
+                        thinPositions[j * 6 + 1] = parentNode.position.y;
+                        thinPositions[j * 6 + 2] = parentNode.position.z;
+                        thinPositions[j * 6 + 3] = childNode.position.x;
+                        thinPositions[j * 6 + 4] = childNode.position.y;
+                        thinPositions[j * 6 + 5] = childNode.position.z;
+                    }
+                    this.batchedThinLinesGeometry.setPositions(thinPositions);
+                    this.batchedThinLinesMaterial.opacity = 1.0;
+                }
             }
-            this.batchedLinesGeometry.setPositions(fatPositions);
-            this.batchedLinesMaterial.opacity = 1.0;
-        }
-        if (this.batchedThinLines && this.batchedThinConnections) {
-            for (let j = 0; j < this.batchedThinConnections.length; j++) {
-                const { parentNode, childNode } = this.batchedThinConnections[j];
-                thinPositions[j * 6 + 0] = parentNode.position.x;
-                thinPositions[j * 6 + 1] = parentNode.position.y;
-                thinPositions[j * 6 + 2] = parentNode.position.z;
-                thinPositions[j * 6 + 3] = childNode.position.x;
-                thinPositions[j * 6 + 4] = childNode.position.y;
-                thinPositions[j * 6 + 5] = childNode.position.z;
-            }
-            this.batchedThinLinesGeometry.setPositions(thinPositions);
-            this.batchedThinLinesMaterial.opacity = 1.0;
-        }
+        };
+
+        requestAnimationFrame(animateStep);
     }
 
     updateAnimatedConnections() {
@@ -825,7 +839,8 @@ class Visualizer {
     setLabelContainer(container) {
         this.nodeLabelsContainer = container;
         this.showNodeLabels = false;
-        this.needsLabelUpdate = true;
+        this.labelSize = 12; // Default font size in px
+        this._labelPool = []; // Pool of label DOM elements for reuse
     }
 
     toggleNodeLabels(show) {
@@ -833,27 +848,56 @@ class Visualizer {
         if (this.nodeLabelsContainer) {
             this.nodeLabelsContainer.style.display = show ? "block" : "none";
         }
-        this.needsLabelUpdate = true;
+    }
+
+    setLabelSize(size) {
+        this.labelSize = size;
     }
 
     updateNodeLabels(camera, renderer) {
         if (!this.showNodeLabels || !this.nodeLabelsContainer) return;
         const rect = renderer.domElement.getBoundingClientRect();
-        this.nodeLabelsContainer.innerHTML = '';
+        
+        // Count visible nodes
+        let visibleIndex = 0;
+        const visibleNodes = [];
         this.nodes.forEach(node => {
-            if (!node.isPlaced) return;
+            if (node.isPlaced) {
+                visibleNodes.push(node);
+            }
+        });
+
+        // Ensure we have enough labels in the pool
+        while (this._labelPool.length < visibleNodes.length) {
+            const label = document.createElement('div');
+            label.className = 'node-label';
+            this._labelPool.push(label);
+        }
+
+        // Update and show labels for visible nodes
+        visibleNodes.forEach((node, i) => {
+            const label = this._labelPool[i];
             const pos = node.position.clone();
             pos.project(camera);
             const x = (pos.x * 0.5 + 0.5) * rect.width + rect.left;
             const y = (-pos.y * 0.5 + 0.5) * rect.height + rect.top;
-            const label = document.createElement('div');
-            label.className = 'node-label';
+            
             label.textContent = node.data.name;
             label.style.left = `${x}px`;
             label.style.top = `${y - 18}px`;
-            this.nodeLabelsContainer.appendChild(label);
+            label.style.fontSize = `${this.labelSize}px`;
+            label.style.display = 'block';
+            
+            // Append to container if not already
+            if (!label.parentNode) {
+                this.nodeLabelsContainer.appendChild(label);
+            }
         });
-        this.needsLabelUpdate = false;
+
+        // Hide any extra labels in the pool
+        for (let i = visibleNodes.length; i < this._labelPool.length; i++) {
+            this._labelPool[i].style.display = 'none';
+        }
     }
 
     updateConfig(newConfig) {
@@ -930,45 +974,225 @@ class Visualizer {
         }
     }
 
-    // 3. Highlight all links connected to a node (incoming and outgoing)
-    // Also highlight all ancestor links up to the root
-    highlightLinksForNode(nodeData, color) {
-        if (!this.animatedConnections) return;
-        // Reset all lines to default color first
-        this.animatedConnections.forEach(({ line }) => {
-            if (!line.userData.originalColor) {
-                line.userData.originalColor = line.material.color.clone();
-            }
-            line.material.color.copy(line.userData.originalColor);
-        });
-
-        // Highlight outgoing and incoming links
-        this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
-            if (
-                (parentNode.data.uniqueKey === nodeData.uniqueKey) || // outgoing
-                (childNode.data.uniqueKey === nodeData.uniqueKey)     // incoming
-            ) {
-                line.material.color.set(color);
-            }
-        });
-
-        // --- Highlight all ancestor links up to the root ---
+    // Get all ancestor node keys (from node up to root)
+    getAncestorKeys(nodeData) {
+        const ancestors = [];
         let currentNode = nodeData;
         while (true) {
-            // Find parent of the current node
             const parent = this.nodes.find(n => n.data.uniqueKey === currentNode.parent);
-            if (!parent) break; // No more parents, stop
-            // Highlight the link from parent to currentNode
-            this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
-                if (
-                    parentNode.data.uniqueKey === parent.data.uniqueKey &&
-                    childNode.data.uniqueKey === currentNode.uniqueKey
-                ) {
-                    line.material.color.set(color);
+            if (!parent) break;
+            ancestors.push(parent.data.uniqueKey);
+            currentNode = parent.data;
+        }
+        return ancestors;
+    }
+
+    // Get all descendant node keys (recursive children)
+    getDescendantKeys(nodeData) {
+        const descendants = [];
+        const queue = [nodeData.uniqueKey];
+        const visited = new Set();
+        
+        while (queue.length > 0) {
+            const currentKey = queue.shift();
+            if (visited.has(currentKey)) continue;
+            visited.add(currentKey);
+            
+            // Find all children of current node
+            this.nodes.forEach(n => {
+                if (n.data.parent === currentKey && !visited.has(n.data.uniqueKey)) {
+                    descendants.push(n.data.uniqueKey);
+                    queue.push(n.data.uniqueKey);
                 }
             });
-            // Continue up the chain with this parent
-            currentNode = parent.data;
+        }
+        return descendants;
+    }
+
+    // 3. Highlight all links connected to a node (incoming and outgoing)
+    // Also highlight all ancestor links up to the root AND all descendants
+    // Uses bright white color with bloom effect for eye-catching highlights
+    highlightLinksForNode(nodeData, color) {
+        // Build sets of highlighted node keys
+        const selectedKey = nodeData.uniqueKey;
+        const ancestorKeys = new Set(this.getAncestorKeys(nodeData));
+        const descendantKeys = new Set(this.getDescendantKeys(nodeData));
+        const highlightedKeys = new Set([selectedKey, ...ancestorKeys, ...descendantKeys]);
+
+        // Bright highlight colors for bloom effect
+        const selectedColor = 0xffffff; // Pure white for selected node
+        const ancestorColor = 0xffff88; // Warm white/yellow for ancestors
+        const descendantColor = 0x88ffff; // Cyan for descendants
+        const lineHighlightColor = 0xffffff; // Pure white for lines
+
+        // Reset all node colors to original and then highlight selected/ancestors/descendants
+        this.nodes.forEach(node => {
+            if (!node.mesh) return;
+            // Store original color and layer if not already stored
+            if (!node.mesh.userData.originalColor) {
+                node.mesh.userData.originalColor = node.mesh.material.color.clone();
+            }
+            if (node.mesh.userData.originalLayer === undefined) {
+                node.mesh.userData.originalLayer = node.mesh.layers.mask;
+            }
+            
+            if (node.data.uniqueKey === selectedKey) {
+                // Selected node: bright white with bloom and larger scale
+                node.mesh.material.color.set(selectedColor);
+                node.mesh.scale.set(1.8, 1.8, 1.8);
+                node.mesh.layers.enable(0); // Enable bloom layer
+            } else if (ancestorKeys.has(node.data.uniqueKey)) {
+                // Ancestor nodes: warm white with bloom
+                node.mesh.material.color.set(ancestorColor);
+                node.mesh.scale.set(1.5, 1.5, 1.5);
+                node.mesh.layers.enable(0); // Enable bloom layer
+            } else if (descendantKeys.has(node.data.uniqueKey)) {
+                // Descendant nodes: cyan with bloom
+                node.mesh.material.color.set(descendantColor);
+                node.mesh.scale.set(1.3, 1.3, 1.3);
+                node.mesh.layers.enable(0); // Enable bloom layer
+            } else {
+                // Non-highlighted nodes: restore original color, scale, and layer
+                node.mesh.material.color.copy(node.mesh.userData.originalColor);
+                node.mesh.scale.set(1, 1, 1);
+                // Restore original layer mask
+                node.mesh.layers.mask = node.mesh.userData.originalLayer;
+            }
+        });
+
+        // Handle batched fat lines
+        if (this.batchedLines && this.batchedConnections && this.batchedLinesGeometry) {
+            const colors = [];
+            const highlightColor = new THREE.Color(lineHighlightColor);
+            
+            for (let j = 0; j < this.batchedConnections.length; j++) {
+                const { parentNode, childNode } = this.batchedConnections[j];
+                const isHighlighted = highlightedKeys.has(parentNode.data.uniqueKey) && 
+                                     highlightedKeys.has(childNode.data.uniqueKey);
+                
+                if (isHighlighted) {
+                    colors.push(highlightColor.r, highlightColor.g, highlightColor.b);
+                    colors.push(highlightColor.r, highlightColor.g, highlightColor.b);
+                } else {
+                    // Use original line color
+                    let lineColor = this.config.color_line;
+                    if (childNode.data.linktype && this.config.linktypeColors[childNode.data.linktype]) {
+                        lineColor = this.config.linktypeColors[childNode.data.linktype];
+                    }
+                    const origColor = new THREE.Color(lineColor);
+                    colors.push(origColor.r, origColor.g, origColor.b);
+                    colors.push(origColor.r, origColor.g, origColor.b);
+                }
+            }
+            this.batchedLinesGeometry.setColors(colors);
+            // Enable bloom layer for highlighted lines
+            this.batchedLines.layers.enable(0);
+        }
+
+        // Handle batched thin lines
+        if (this.batchedThinLines && this.batchedThinConnections && this.batchedThinLinesGeometry) {
+            const colors = [];
+            const highlightColor = new THREE.Color(lineHighlightColor);
+            
+            for (let j = 0; j < this.batchedThinConnections.length; j++) {
+                const { parentNode, childNode } = this.batchedThinConnections[j];
+                const isHighlighted = highlightedKeys.has(parentNode.data.uniqueKey) && 
+                                     highlightedKeys.has(childNode.data.uniqueKey);
+                
+                if (isHighlighted) {
+                    colors.push(highlightColor.r, highlightColor.g, highlightColor.b);
+                    colors.push(highlightColor.r, highlightColor.g, highlightColor.b);
+                } else {
+                    // Use original line color
+                    let lineColor = this.config.color_line;
+                    if (childNode.data.linktype && this.config.linktypeColors[childNode.data.linktype]) {
+                        lineColor = this.config.linktypeColors[childNode.data.linktype];
+                    }
+                    const origColor = new THREE.Color(lineColor);
+                    colors.push(origColor.r, origColor.g, origColor.b);
+                    colors.push(origColor.r, origColor.g, origColor.b);
+                }
+            }
+            this.batchedThinLinesGeometry.setColors(colors);
+            // Enable bloom layer for highlighted lines
+            this.batchedThinLines.layers.enable(0);
+        }
+
+        // Handle legacy animatedConnections if present
+        if (this.animatedConnections) {
+            // Reset all lines to default color first
+            this.animatedConnections.forEach(({ line }) => {
+                if (!line.userData.originalColor) {
+                    line.userData.originalColor = line.material.color.clone();
+                }
+                line.material.color.copy(line.userData.originalColor);
+            });
+
+            // Highlight links where both endpoints are in highlighted set
+            this.animatedConnections.forEach(({ line, parentNode, childNode }) => {
+                if (
+                    highlightedKeys.has(parentNode.data.uniqueKey) &&
+                    highlightedKeys.has(childNode.data.uniqueKey)
+                ) {
+                    line.material.color.set(lineHighlightColor);
+                    line.layers.enable(0); // Enable bloom layer
+                }
+            });
+        }
+    }
+
+    // Clear all node highlights (restore original colors, scales, and layers)
+    clearNodeHighlights() {
+        this.nodes.forEach(node => {
+            if (!node.mesh) return;
+            if (node.mesh.userData.originalColor) {
+                node.mesh.material.color.copy(node.mesh.userData.originalColor);
+            }
+            node.mesh.scale.set(1, 1, 1);
+            // Restore original layer mask
+            if (node.mesh.userData.originalLayer !== undefined) {
+                node.mesh.layers.mask = node.mesh.userData.originalLayer;
+            }
+        });
+
+        // Reset batched line colors
+        if (this.batchedLines && this.batchedConnections && this.batchedLinesGeometry) {
+            const colors = [];
+            for (let j = 0; j < this.batchedConnections.length; j++) {
+                const { childNode } = this.batchedConnections[j];
+                let lineColor = this.config.color_line;
+                if (childNode.data.linktype && this.config.linktypeColors[childNode.data.linktype]) {
+                    lineColor = this.config.linktypeColors[childNode.data.linktype];
+                }
+                const color = new THREE.Color(lineColor);
+                colors.push(color.r, color.g, color.b);
+                colors.push(color.r, color.g, color.b);
+            }
+            this.batchedLinesGeometry.setColors(colors);
+        }
+
+        if (this.batchedThinLines && this.batchedThinConnections && this.batchedThinLinesGeometry) {
+            const colors = [];
+            for (let j = 0; j < this.batchedThinConnections.length; j++) {
+                const { childNode } = this.batchedThinConnections[j];
+                let lineColor = this.config.color_line;
+                if (childNode.data.linktype && this.config.linktypeColors[childNode.data.linktype]) {
+                    lineColor = this.config.linktypeColors[childNode.data.linktype];
+                }
+                const color = new THREE.Color(lineColor);
+                colors.push(color.r, color.g, color.b);
+                colors.push(color.r, color.g, color.b);
+            }
+            this.batchedThinLinesGeometry.setColors(colors);
+        }
+
+        // Reset legacy line colors
+        if (this.animatedConnections) {
+            this.animatedConnections.forEach(({ line }) => {
+                if (line.userData.originalColor) {
+                    line.material.color.copy(line.userData.originalColor);
+                }
+            });
         }
     }
 

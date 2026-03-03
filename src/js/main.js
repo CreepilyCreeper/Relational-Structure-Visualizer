@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { fetchData } from './database.js';
+import { fetchData, discoverSelfiePath } from './database.js';
 import { Visualizer } from './visualizer.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
@@ -58,6 +58,7 @@ const nodeDetailsElem = document.getElementById('node-details');
 const croppedToggle = document.getElementById('cropped-toggle');
 const spriteScaleSlider = document.getElementById('sprite-scale-slider');
 const toggleNamesBtn = document.getElementById('toggle-names');
+const nameSizeSlider = document.getElementById('name-size-slider');
 const nodeLabelsContainer = document.getElementById('node-labels-container');
 
 // Scene setup
@@ -137,7 +138,16 @@ function getMouseWorldPositionAtY(mouse, camera, y) {
 
 function displayNodeData(node) {
     nodeNameElem.innerHTML = `${node.name || ''} (${node.joinDate || ''})`;
-    nodeImageElem.src = node.selfie || '';
+    // Show loading state while discovering actual selfie path
+    nodeImageElem.src = '';
+    nodeImageElem.alt = 'Loading...';
+    // Lazy discover the correct selfie path
+    if (node.name) {
+        discoverSelfiePath(node.name, (actualPath) => {
+            nodeImageElem.src = actualPath;
+            nodeImageElem.alt = node.name;
+        });
+    }
     nodeDetailsElem.innerHTML = node.testimonial ? node.testimonial.replace(/\n/g, '<br>') : '';
 }
 
@@ -420,6 +430,12 @@ toggleNamesBtn.addEventListener('click', () => {
     visualizer.showNodeLabels = !visualizer.showNodeLabels;
     toggleNamesBtn.textContent = visualizer.showNodeLabels ? "Hide Names" : "Show Names";
     visualizer.toggleNodeLabels(visualizer.showNodeLabels);
+});
+
+// --- Name size slider ---
+nameSizeSlider.addEventListener('input', () => {
+    const size = parseFloat(nameSizeSlider.value);
+    visualizer.setLabelSize(size);
 });
 
 // --- Search Bar Functionality (unchanged, see your original) ---

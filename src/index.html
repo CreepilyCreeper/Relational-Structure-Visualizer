@@ -4,7 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Community Visualizer</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <!-- Preconnect to external origins for faster loading -->
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://opensheet.elk.sh" crossorigin>
+    <link rel="dns-prefetch" href="https://unpkg.com">
+    <link rel="dns-prefetch" href="https://opensheet.elk.sh">
+    <!-- CSS with print media trick for non-blocking load -->
+    <link rel="stylesheet" href="css/styles.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="css/styles.css"></noscript>
+    <!-- Inline critical CSS for immediate render -->
+    <style>
+        body { margin: 0; background: #050505; overflow: hidden; }
+        #visualizer-container { width: 100%; height: 100vh; position: relative; }
+    </style>
 </head>
 <body>
     <div id="visualizer-container"></div>
@@ -16,7 +28,7 @@
         <div class="sidebar-section image-section">
             <div class="node-name" id="node-name">Name</div>
             <div class="node-image-wrapper">
-                <img id="node-image" src="" />
+                <img id="node-image" src="" loading="lazy" decoding="async" onerror="this.src='./assets/selfies/fallback.png'" />
             </div>
             <br>
         </div>
@@ -34,14 +46,21 @@
             <label for="sprite-scale-slider">Sprite Size</label>
             <input type="range" id="sprite-scale-slider" min="0.5" max="10" step="0.1" value="5">
         </div>
+        <div id="name-size-container">
+            <label for="name-size-slider">Name Size</label>
+            <input type="range" id="name-size-slider" min="6" max="32" step="1" value="12">
+        </div>
     </div>
     <div id="node-labels-container" style="pointer-events:none; position:fixed; left:0; top:0; width:100vw; height:100vh; z-index:2000;"></div>
 
+    <!-- Preload Three.js for faster module loading -->
+    <link rel="modulepreload" href="https://unpkg.com/three@0.164.1/build/three.module.js">
+    
     <script type="importmap">
     {
         "imports": {
-            "three": "https://unpkg.com/three@latest/build/three.module.js",
-            "three/examples/jsm/": "https://unpkg.com/three@latest/examples/jsm/"
+            "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+            "three/examples/jsm/": "https://unpkg.com/three@0.164.1/examples/jsm/"
         }
     }
     </script>

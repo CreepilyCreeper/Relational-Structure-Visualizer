@@ -172,7 +172,8 @@ body {
 
 #cropped-toggle,
 #toggle-names,
-#sprite-scale-container {
+#sprite-scale-container,
+#name-size-container {
     background: #222;
     color: #fff;
     border-radius: 0.8vw;
@@ -185,11 +186,14 @@ body {
 }
 
 #sprite-scale-container label,
-#sprite-scale-container input[type="range"] {
+#sprite-scale-container input[type="range"],
+#name-size-container label,
+#name-size-container input[type="range"] {
     font-size: clamp(0.5em, 5vw, 1em);
 }
 
-#sprite-scale-slider {
+#sprite-scale-slider,
+#name-size-slider {
     width: clamp(60px, 10vw, 120px);
 }
 
@@ -199,7 +203,7 @@ body {
     background: rgba(0, 0, 0, 0.5);
     /*padding: 2px 8px;*/
     border-radius: 6px;
-    font-size: 0.1em;
+    font-size: 12px;
     font-family: inherit;
     pointer-events: none;
     white-space: nowrap;
@@ -207,5 +211,4 @@ body {
     z-index: 2001;
     font-weight: bold;
     opacity: 0.9;
-    transition: opacity 0.5s;
 }
