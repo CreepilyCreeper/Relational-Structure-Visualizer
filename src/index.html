@@ -9,6 +9,10 @@
     <link rel="preconnect" href="https://opensheet.elk.sh" crossorigin>
     <link rel="dns-prefetch" href="https://unpkg.com">
     <link rel="dns-prefetch" href="https://opensheet.elk.sh">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- CSS with print media trick for non-blocking load -->
     <link rel="stylesheet" href="css/styles.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="css/styles.css"></noscript>
@@ -20,7 +24,7 @@
 </head>
 <body>
     <div id="visualizer-container"></div>
-    <div id="side-menu" style="display:none;">
+    <div id="side-menu" class="side-menu-hidden">
         <div class="sidebar-section search-section">
             <input type="text" id="sidebar-search" placeholder="Search by name or join date..." autocomplete="off">
         </div>

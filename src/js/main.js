@@ -532,7 +532,9 @@ async function init() {
             const center = visualizer.getTreeLayoutCenter(layers);
             cameraConfig.center = center;
             updateCameraPosition();
-            document.getElementById('side-menu').style.display = 'block';
+            // Slide in the side menu with a CSS transition
+            const sideMenuEl = document.getElementById('side-menu');
+            requestAnimationFrame(() => sideMenuEl.classList.remove('side-menu-hidden'));
             resizeRenderer();
             setupSidebarSearch(data.members);
         }

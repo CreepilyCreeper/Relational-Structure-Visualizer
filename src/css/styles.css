@@ -1,8 +1,8 @@
 body {
     margin: 0;
     padding: 0;
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
+    font-family: 'Inter', Arial, sans-serif;
+    background-color: #0a0a0a;
 }
 
 #visualizer {
@@ -69,14 +69,25 @@ body {
     right: 0;
     width: var(--side-menu-width);
     height: 100%;
-    background: #696969;
-    box-shadow: 0 0 10px rgba(0,0,0,0.08);
+    background: #111113;
+    border-left: 1px solid rgba(255,255,255,0.07);
+    box-shadow: -4px 0 32px rgba(0,0,0,0.55);
     padding: 0;
     display: flex;
     flex-direction: column;
-    overflow-y: auto; /* Add this line to enable vertical scrolling */
-    scrollbar-width: thin; /* For Firefox */
-    scrollbar-color: #b0b0b0 #444444; /* For Firefox */
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #3a3a3a #111113;
+    transform: translateX(0);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+    opacity: 1;
+    color: #e8e8e8;
+}
+
+.side-menu-hidden {
+    transform: translateX(100%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 .sidebar-section {
@@ -86,8 +97,9 @@ body {
 
 .sidebar-divider {
     height: 1px;
-    background: #555555;
-    margin: 0 16px;
+    background: rgba(255,255,255,0.08);
+    margin: 0;
+    flex-shrink: 0;
 }
 
 .image-section {
@@ -100,10 +112,13 @@ body {
 }
 
 .node-name {
-    font-weight: bold;
+    font-weight: 700;
     text-align: center;
-    margin-bottom: 12px;
-    font-size: 1.2em;
+    margin-bottom: 14px;
+    font-size: 1.15em;
+    color: #f0f0f0;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
 }
 
 .node-image-wrapper {
@@ -113,102 +128,191 @@ body {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background: #f5f5f500; /* Default background */
+    background: transparent;
+    border-radius: 10px;
 }
 
 #node-image {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    /*aspect-ratio: 1/1; /* keeps image square, adjust if needed */
-    border-radius: 8px;
-    background: transparent; /* Ensure the image itself doesn't override the wrapper's background */
+    border-radius: 10px;
+    background: transparent;
+    transition: opacity 0.25s ease;
 }
 
 #node-image:empty {
-    background: #5d5d5d00; /* Fallback background when the image is missing */
-    border-radius: 8px;
+    background: transparent;
+    border-radius: 10px;
 }
 
-/* Optional: Style the scrollbar for Webkit browsers */
+/* Webkit scrollbar for sidebar */
 #side-menu::-webkit-scrollbar {
-    width: 8px;
+    width: 5px;
 }
 #side-menu::-webkit-scrollbar-thumb {
-    background: #b0b0b0;
+    background: #333;
     border-radius: 4px;
 }
+#side-menu::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
 #side-menu::-webkit-scrollbar-track {
-    background: #444444;
+    background: transparent;
+}
+
+/* Search dropdown dark theme override */
+#sidebar-search-dropdown {
+    background: #1c1c1e !important;
+    color: #e8e8e8 !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+    overflow: hidden !important;
+}
+
+#sidebar-search-dropdown > div {
+    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
+    transition: background 0.15s;
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 0.88em;
+}
+
+#sidebar-search-dropdown > div:last-child {
+    border-bottom: none !important;
+}
+
+#sidebar-search-dropdown > div:hover {
+    background: rgba(120,160,255,0.12) !important;
+    color: #fff !important;
+}
+
+/* Details / testimonial section */
+.details-section {
+    font-size: 0.88em;
+    line-height: 1.65;
+    color: #b0b0b0;
+}
+
+.details-section br + br {
+    display: none;
 }
 
 .search-section {
-    padding: 16px 20px 8px 20px;
-    background: #696969;
+    padding: 14px 16px 10px 16px;
+    background: transparent;
     box-sizing: border-box;
+    position: relative;
 }
 
 #sidebar-search {
     width: 100%;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid #bbb;
-    font-size: 1em;
-    background: #f5f5f5;
-    color: #222;
+    padding: 9px 14px 9px 36px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 0.9em;
+    font-family: 'Inter', Arial, sans-serif;
+    background: rgba(255,255,255,0.06);
+    color: #e8e8e8;
     outline: none;
     box-sizing: border-box;
+    transition: border-color 0.2s, background 0.2s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+}
+
+#sidebar-search::placeholder {
+    color: #777;
+}
+
+#sidebar-search:focus {
+    border-color: rgba(120,160,255,0.5);
+    background-color: rgba(255,255,255,0.09);
 }
 
 #bottom-controls {
     position: fixed;
-    bottom: 0.5vw;
-    left: 0.5vw;
+    bottom: clamp(8px, 1vw, 16px);
+    left: clamp(8px, 1vw, 16px);
     z-index: 3000;
     display: flex;
     align-items: flex-end;
-    gap: 0.25vw; /* or use gap: 1em; for spacing between controls */
+    gap: clamp(4px, 0.4vw, 8px);
 }
 
 #cropped-toggle,
 #toggle-names,
 #sprite-scale-container,
 #name-size-container {
-    background: #222;
-    color: #fff;
-    border-radius: 0.8vw;
+    background: rgba(18, 18, 20, 0.72);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    color: #e8e8e8;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
     user-select: none;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
-    font-size: clamp(0.5em, 5vw, 1em);
-    padding: clamp(10px, 1.5vw, 20px) clamp(5px, 5vw, 20px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset;
+    font-size: clamp(0.5em, 1.5vw, 0.92em);
+    font-family: 'Inter', Arial, sans-serif;
+    font-weight: 500;
+    padding: clamp(7px, 1vw, 12px) clamp(10px, 1.5vw, 18px);
     display: flex;
     align-items: center;
+    gap: 6px;
+    transition: background 0.18s, border-color 0.18s, transform 0.12s;
+    cursor: pointer;
+}
+
+#cropped-toggle:hover,
+#toggle-names:hover {
+    background: rgba(40, 40, 50, 0.85);
+    border-color: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
+}
+
+#cropped-toggle:active,
+#toggle-names:active {
+    transform: translateY(0);
 }
 
 #sprite-scale-container label,
 #sprite-scale-container input[type="range"],
 #name-size-container label,
 #name-size-container input[type="range"] {
-    font-size: clamp(0.5em, 5vw, 1em);
+    font-size: inherit;
+}
+
+#sprite-scale-container label,
+#name-size-container label {
+    color: #aaa;
+    font-size: 0.9em;
+    white-space: nowrap;
 }
 
 #sprite-scale-slider,
 #name-size-slider {
-    width: clamp(60px, 10vw, 120px);
+    width: clamp(60px, 8vw, 110px);
+    accent-color: #7899ff;
+    cursor: pointer;
 }
 
 .node-label {
     position: absolute;
-    color: #ffffff;
-    background: rgba(0, 0, 0, 0.5);
-    /*padding: 2px 8px;*/
-    border-radius: 6px;
+    color: #f0f0f0;
+    background: rgba(10, 10, 14, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255,255,255,0.07);
+    padding: 2px 7px;
+    border-radius: 5px;
     font-size: 12px;
-    font-family: inherit;
+    font-family: 'Inter', Arial, sans-serif;
     pointer-events: none;
     white-space: nowrap;
     transform: translate(-50%, -100%);
     z-index: 2001;
-    font-weight: bold;
-    opacity: 0.9;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    opacity: 0.92;
 }

@@ -430,18 +430,25 @@ class Visualizer {
                 camera.layers.set(BLOOM_LAYER);
                 renderer.render(scene, camera);
 
+                // Render label sprites (layer 2) — depth-tested against nodes, no bloom
+                const LABEL_LAYER = 2;
+                camera.layers.set(LABEL_LAYER);
+                renderer.render(scene, camera);
+
                 // Draw sprites / non-bloom objects on top
                 camera.layers.set(NON_BLOOM_LAYER);
                 renderer.render(scene, camera);
 
                 renderer.autoClear = true;
             } else {
+                // Non-bloom path: enable all layers including labels (layer 2)
+                this.camera.layers.enableAll();
                 this.renderer.render(this.scene, this.camera);
             }
 
-            // --- Node label update (every frame when visible) ---
-            if (this.showNodeLabels && this.nodeLabelsContainer) {
-                this.updateNodeLabels(this.camera, this.renderer);
+            // Attach label sprites to any newly-placed nodes
+            if (this.showNodeLabels) {
+                this._updateLabelSpritesForNewNodes();
             }
 
             this.iter++;
@@ -835,69 +842,147 @@ class Visualizer {
 
     // --- End Animated Connections ---
 
-    // --- Node label overlay logic ---
+    // --- 3D sprite-based node label logic ---
     setLabelContainer(container) {
+        // Keep ref for backward compat, but labels are now 3D sprites
         this.nodeLabelsContainer = container;
+        if (container) container.style.display = 'none'; // Hide HTML overlay
         this.showNodeLabels = false;
-        this.labelSize = 12; // Default font size in px
-        this._labelPool = []; // Pool of label DOM elements for reuse
+        this.labelSize = 12; // Logical font size (controls world-space scale)
+        this._labelSprites = []; // Array of label sprites in the scene
     }
 
     toggleNodeLabels(show) {
         this.showNodeLabels = show;
-        if (this.nodeLabelsContainer) {
-            this.nodeLabelsContainer.style.display = show ? "block" : "none";
+        if (show) {
+            this._createAllLabelSprites();
+        } else {
+            this._removeAllLabelSprites();
         }
     }
 
     setLabelSize(size) {
         this.labelSize = size;
+        if (this.showNodeLabels) {
+            // Regenerate all label sprites at the new size
+            this._removeAllLabelSprites();
+            this._createAllLabelSprites();
+        }
     }
 
-    updateNodeLabels(camera, renderer) {
-        if (!this.showNodeLabels || !this.nodeLabelsContainer) return;
-        const rect = renderer.domElement.getBoundingClientRect();
-        
-        // Count visible nodes
-        let visibleIndex = 0;
-        const visibleNodes = [];
+    _createLabelTexture(text, fontSize) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Render at 4x for crispness
+        const texScale = 4;
+        const scaledFontSize = fontSize * texScale;
+        const font = `600 ${scaledFontSize}px Inter, Arial, sans-serif`;
+        ctx.font = font;
+        const metrics = ctx.measureText(text);
+        const textWidth = metrics.width;
+        const textHeight = scaledFontSize * 1.3;
+
+        const paddingX = scaledFontSize * 0.6;
+        const paddingY = scaledFontSize * 0.4;
+        canvas.width = Math.ceil(textWidth + paddingX * 2);
+        canvas.height = Math.ceil(textHeight + paddingY * 2);
+
+        // Re-set font after canvas resize
+        ctx.font = font;
+
+        // Rounded-rect background
+        const radius = scaledFontSize * 0.35;
+        ctx.fillStyle = 'rgba(10, 10, 14, 0.70)';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, canvas.width, canvas.height, radius);
+        ctx.fill();
+
+        // Subtle border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(0, 0, canvas.width, canvas.height, radius);
+        ctx.stroke();
+
+        // Text
+        ctx.fillStyle = '#f0f0f0';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        // Improve text sharpness
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+
+        return { texture, width: canvas.width, height: canvas.height };
+    }
+
+    _createLabelSpriteForNode(node) {
+        if (!node.data || !node.data.name) return null;
+        const { texture, width, height } = this._createLabelTexture(node.data.name, this.labelSize);
+        const material = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            depthTest: true,
+            depthWrite: false,
+            sizeAttenuation: true,
+        });
+        const sprite = new THREE.Sprite(material);
+
+        // Scale to world units — height proportional to labelSize
+        const worldHeight = this.labelSize * 0.025;
+        const aspect = width / height;
+        sprite.scale.set(worldHeight * aspect, worldHeight, 1);
+
+        // Position above the node sphere
+        const nodeRadius = node.originalScale || this.config.nodeSize || 0.2;
+        sprite.position.set(0, nodeRadius + worldHeight * 0.6, 0);
+
+        // Use a dedicated label layer (layer 2) — no bloom, but depth-tested against nodes
+        sprite.layers.set(2);
+
+        return sprite;
+    }
+
+    _createAllLabelSprites() {
+        this._removeAllLabelSprites(); // Clean up any existing
         this.nodes.forEach(node => {
-            if (node.isPlaced) {
-                visibleNodes.push(node);
+            if (!node.mesh || !node.isPlaced) return;
+            const sprite = this._createLabelSpriteForNode(node);
+            if (sprite) {
+                node.mesh.add(sprite);
+                node._labelSprite = sprite;
+                this._labelSprites.push(sprite);
             }
         });
+    }
 
-        // Ensure we have enough labels in the pool
-        while (this._labelPool.length < visibleNodes.length) {
-            const label = document.createElement('div');
-            label.className = 'node-label';
-            this._labelPool.push(label);
-        }
+    _removeAllLabelSprites() {
+        this._labelSprites.forEach(sprite => {
+            if (sprite.parent) sprite.parent.remove(sprite);
+            if (sprite.material.map) sprite.material.map.dispose();
+            sprite.material.dispose();
+        });
+        this._labelSprites = [];
+        this.nodes.forEach(node => { node._labelSprite = null; });
+    }
 
-        // Update and show labels for visible nodes
-        visibleNodes.forEach((node, i) => {
-            const label = this._labelPool[i];
-            const pos = node.position.clone();
-            pos.project(camera);
-            const x = (pos.x * 0.5 + 0.5) * rect.width + rect.left;
-            const y = (-pos.y * 0.5 + 0.5) * rect.height + rect.top;
-            
-            label.textContent = node.data.name;
-            label.style.left = `${x}px`;
-            label.style.top = `${y - 18}px`;
-            label.style.fontSize = `${this.labelSize}px`;
-            label.style.display = 'block';
-            
-            // Append to container if not already
-            if (!label.parentNode) {
-                this.nodeLabelsContainer.appendChild(label);
+    // Attach labels to newly-placed nodes (called from render loop)
+    _updateLabelSpritesForNewNodes() {
+        if (!this.showNodeLabels) return;
+        this.nodes.forEach(node => {
+            if (node.isPlaced && node.mesh && !node._labelSprite) {
+                const sprite = this._createLabelSpriteForNode(node);
+                if (sprite) {
+                    node.mesh.add(sprite);
+                    node._labelSprite = sprite;
+                    this._labelSprites.push(sprite);
+                }
             }
         });
-
-        // Hide any extra labels in the pool
-        for (let i = visibleNodes.length; i < this._labelPool.length; i++) {
-            this._labelPool[i].style.display = 'none';
-        }
     }
 
     updateConfig(newConfig) {
@@ -912,6 +997,7 @@ class Visualizer {
     }
 
     clearNodes() {
+        this._removeAllLabelSprites();
         this.nodes.forEach(node => {
             if (node.mesh) {
                 this.scene.remove(node.mesh);
