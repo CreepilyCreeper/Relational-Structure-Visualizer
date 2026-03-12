@@ -167,9 +167,13 @@ class Visualizer {
                 node.data._layerColor = color;
                 node.config = { ...node.config, nodeColor: color.getHex() };
 
-                // --- PRC node color override ---
-                if (node.data.nodetype === "prc") {
+                // --- PRC node color override (case-insensitive) ---
+                const nt = (node.data.nodetype || "").toLowerCase();
+                if (nt === "prc") {
                     node.config.nodeColor = this.config.color_prc;
+                } else if (nt && nt !== "christian" && nt !== "") {
+                    // Unknown nodetype — use default color (already set above)
+                    console.warn(`[visualizer] Unknown nodetype "${node.data.nodetype}" for "${node.data.name}" — using default color`);
                 }
             });
         });
@@ -217,6 +221,8 @@ class Visualizer {
         this.placedNodeCount = 0; // Reset on new tree
         this.allNodesFlat = layers.flat();
         this.layersForPlacement = layers;
+        // Target: place all nodes in 5 seconds at ~60fps (300 frames)
+        this.nodesPerTick = Math.max(1, Math.ceil((this.allNodesFlat.length - 1) / 300));
         // Place only the root node at first
         layers.forEach((layer, layerIndex) => {
             layer.forEach((node, nodeIndex) => {
@@ -276,42 +282,46 @@ class Visualizer {
                 lastFpsTime = now;
             }
 
-            // Place a new node every N iterations
+            // Place multiple nodes per tick to finish spawning in ~5 seconds
             if (
                 this.iter % this.config.nodePlacementInterval === 0 &&
                 this.placedNodeCount < this.allNodesFlat.length
             ) {
-                const nodeToPlace = this.allNodesFlat[this.placedNodeCount];
-                if (nodeToPlace && !nodeToPlace.isPlaced) {
-                    // Find parent node using parent property
-                    let parentNode = null;
-                    if (nodeToPlace.data.parent) {
-                        parentNode = this.nodes.find(n => n.data.uniqueKey === nodeToPlace.data.parent);
+                const batchSize = this.nodesPerTick || 1;
+                for (let b = 0; b < batchSize; b++) {
+                    if (this.placedNodeCount >= this.allNodesFlat.length) break;
+                    const nodeToPlace = this.allNodesFlat[this.placedNodeCount];
+                    if (nodeToPlace && !nodeToPlace.isPlaced) {
+                        // Find parent node using parent property
+                        let parentNode = null;
+                        if (nodeToPlace.data.parent) {
+                            parentNode = this.nodes.find(n => n.data.uniqueKey === nodeToPlace.data.parent);
+                        }
+                        // If parent found and placed, position at parent; else, use layer Y
+                        let x = 0, z = 0;
+                        const layerIndex = this.layersForPlacement.findIndex(layer => layer.includes(nodeToPlace));
+                        let y = -layerIndex * this.config.verticalSpacing;
+                        let parentY = y;
+                        if (parentNode && parentNode.isPlaced) {
+                            x = parentNode.position.x;
+                            z = parentNode.position.z;
+                            parentY = parentNode.position.y;
+                        }
+                        nodeToPlace.position.set(x, parentY, z); // Start at parent's position
+                        nodeToPlace.targetY = y; // Glide to this Y
+                        nodeToPlace.glideProgress = 0;
+                        nodeToPlace.isPlaced = true;
+                        // Assign a small random initial velocity to nudge the node
+                        const angle = Math.random() * 2 * Math.PI;
+                        const speed = 1;
+                        nodeToPlace.velocity = new THREE.Vector3(
+                            Math.cos(angle) * speed,
+                            0,
+                            Math.sin(angle) * speed
+                        );
+                        this.placedNodeCount++;
+                        if (nodeToPlace.mesh) nodeToPlace.mesh.visible = true;
                     }
-                    // If parent found and placed, position at parent; else, use layer Y
-                    let x = 0, z = 0;
-                    const layerIndex = this.layersForPlacement.findIndex(layer => layer.includes(nodeToPlace));
-                    let y = -layerIndex * this.config.verticalSpacing;
-                    let parentY = y;
-                    if (parentNode && parentNode.isPlaced) {
-                        x = parentNode.position.x;
-                        z = parentNode.position.z;
-                        parentY = parentNode.position.y;
-                    }
-                    nodeToPlace.position.set(x, parentY, z); // Start at parent's position
-                    nodeToPlace.targetY = y; // Glide to this Y
-                    nodeToPlace.glideProgress = 0; // 0 to 1 over 20 frames
-                    nodeToPlace.isPlaced = true;
-                    // Assign a small random initial velocity to nudge the node
-                    const angle = Math.random() * 2 * Math.PI;
-                    const speed = 1; // Small random speed
-                    nodeToPlace.velocity = new THREE.Vector3(
-                        Math.cos(angle) * speed,
-                        0,
-                        Math.sin(angle) * speed
-                    );
-                    this.placedNodeCount++;
-                    if (nodeToPlace.mesh) nodeToPlace.mesh.visible = true;
                 }
             }
 
@@ -578,6 +588,7 @@ class Visualizer {
         const thinColors = [];
         const thinConnections = [];
 
+        const warnedLinktypes = new Set();
         data.forEach(person => {
             if (person.parent) {
                 const parentNode = nodeMap.get(person.parent);
@@ -588,6 +599,10 @@ class Visualizer {
                         lineColor = this.config.linktypeColors[childNode.data.linktype];
                     } else if (this.config.linktypeColors.default) {
                         lineColor = this.config.linktypeColors.default;
+                    } else if (childNode.data.linktype && !warnedLinktypes.has(childNode.data.linktype)) {
+                        // Unknown linktype — falls back to default line color
+                        warnedLinktypes.add(childNode.data.linktype);
+                        console.warn(`[visualizer] Unknown linktype "${childNode.data.linktype}" — using default color`);
                     }
                     let lineWidth = 2;
                     if (childNode.data.linktype && this.config.linktypeWidths[childNode.data.linktype]) {
@@ -1321,7 +1336,9 @@ class Visualizer {
             layer.forEach(node => {
                 node.data._layerColor = color;
                 node.config = { ...node.config, nodeColor: color.getHex() };
-                if (node.data.nodetype === "prc") {
+                // PRC node color override (case-insensitive; unknown nodetypes use default)
+                const nt = (node.data.nodetype || "").toLowerCase();
+                if (nt === "prc") {
                     node.config.nodeColor = this.config.color_prc;
                 }
             });

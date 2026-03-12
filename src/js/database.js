@@ -118,6 +118,34 @@ const fetchData = async (useTestData = false) => {
             rawRows = await response.json();
         }
 
+        // --- Normalize column names to camelCase (handles case-insensitive sheets) ---
+        // Maps lowercase keys to their canonical camelCase versions
+        const COLUMN_ALIASES = {
+            'joindate': 'joinDate',
+            'linktype': 'linktype',
+            'nodetype': 'nodetype',
+            'testimonial': 'testimonial',
+        };
+        rawRows = rawRows.map(row => {
+            const normalized = {};
+            for (const [key, value] of Object.entries(row)) {
+                const canonical = COLUMN_ALIASES[key.toLowerCase()] || key;
+                normalized[canonical] = value;
+            }
+            return normalized;
+        });
+
+        // Known columns — any extra columns in the data are silently ignored
+        const KNOWN_COLUMNS = new Set(['name', 'selfie', 'joinDate', 'parent', 'linktype', 'nodetype', 'testimonial']);
+
+        // Log extra (unknown) columns once for debugging
+        if (rawRows.length > 0) {
+            const extraCols = Object.keys(rawRows[0]).filter(k => !KNOWN_COLUMNS.has(k));
+            if (extraCols.length > 0) {
+                console.warn(`[data] Ignoring extra columns: ${extraCols.join(', ')}`);
+            }
+        }
+
         // Filter out rows with no name
         const filteredRows = rawRows.filter(row => row.name && row.name.trim());
 
@@ -154,6 +182,7 @@ const fetchData = async (useTestData = false) => {
         // For each member, resolve parent to uniqueKey
         for (const member of members) {
             if (member.parent) {
+                const rawParent = member.parent; // original value for logging
                 const parentCandidates = nameLookup[member.parent];
                 if (parentCandidates && parentCandidates.length > 0) {
                     // Find the parent with joinDate < member's joinDate, closest to it
@@ -168,8 +197,12 @@ const fetchData = async (useTestData = false) => {
                             }
                         }
                     }
+                    if (!chosenParent) {
+                        console.warn(`[data] Invalid parent "${rawParent}" for "${member.name}" (no candidate with earlier joinDate) — treating as no parent`);
+                    }
                     member.parent = chosenParent ? chosenParent.uniqueKey : "";
                 } else {
+                    console.warn(`[data] Invalid parent "${rawParent}" for "${member.name}" (not found) — treating as no parent`);
                     member.parent = "";
                 }
             }

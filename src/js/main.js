@@ -8,11 +8,14 @@ import { WebGLRenderTarget, HalfFloatType } from 'three';
 
 // Camera configuration (hardcoded)
 const cameraConfig = {
-    center: { x: 0, y: 0, z: 0 },
+    center: new THREE.Vector3(0, 0, 0),
     radius: 30,
     theta: Math.PI / 6,
     phi: Math.PI / 3
 };
+
+// Expose cameraConfig for camera following in visualizer
+window.cameraConfig = cameraConfig;
 
 const visualizerConfig = {
     nodeSize: 0.2,
@@ -109,16 +112,32 @@ let hoveredNode = null;
 let hoveredMesh = null;
 let selectedNode = null;
 
+// Expose selectedNode for camera following
+window.selectedNode = selectedNode;
+
 // Camera controls
 let mouseDown = false;
+let rightMouseDown = false;
 let mouseX = 0;
 let mouseY = 0;
+let mouseDownX = 0;   // position at mousedown, for drag detection
+let mouseDownY = 0;
+let hasDragged = false; // true if mouse moved enough to count as a drag
 let cameraRadius = cameraConfig.radius;
 let cameraTheta = cameraConfig.theta;
 let cameraPhi = cameraConfig.phi;
 let draggingNode = null;
 let dragOffset = new THREE.Vector3();
 let dragLayerY = 0;
+const DRAG_THRESHOLD = 5; // pixels
+
+// --- Global drag state for animation loop ---
+window.isDraggingNode = false;
+window.draggedNode = null;
+window.dragOffset = new THREE.Vector3();
+window.dragLayerY = 0;
+window.currentMouseX = 0;
+window.currentMouseY = 0;
 
 function updateCameraPosition() {
     camera.position.x = cameraConfig.center.x + cameraRadius * Math.sin(cameraPhi) * Math.cos(cameraTheta);
@@ -126,6 +145,9 @@ function updateCameraPosition() {
     camera.position.z = cameraConfig.center.z + cameraRadius * Math.sin(cameraPhi) * Math.sin(cameraTheta);
     camera.lookAt(cameraConfig.center.x, cameraConfig.center.y, cameraConfig.center.z);
 }
+
+// Expose updateCameraPosition for camera following in visualizer
+window.updateCameraPosition = updateCameraPosition;
 
 function getMouseWorldPositionAtY(mouse, camera, y) {
     const ray = new THREE.Raycaster();
@@ -151,10 +173,24 @@ function displayNodeData(node) {
     nodeDetailsElem.innerHTML = node.testimonial ? node.testimonial.replace(/\n/g, '<br>') : '';
 }
 
+renderer.domElement.addEventListener('contextmenu', (event) => {
+    event.preventDefault(); // suppress right-click context menu
+});
+
 renderer.domElement.addEventListener('mousedown', (event) => {
-    mouseDown = true;
     mouseX = event.clientX;
     mouseY = event.clientY;
+    mouseDownX = event.clientX;
+    mouseDownY = event.clientY;
+    hasDragged = false;
+
+    if (event.button === 2) {
+        // Right mouse button — pan
+        rightMouseDown = true;
+        return;
+    }
+
+    mouseDown = true;
 
     mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
     mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
@@ -165,26 +201,68 @@ renderer.domElement.addEventListener('mousedown', (event) => {
         // Accept either mesh or sprite
         const nodeData = intersects[0].object.userData.nodeData;
         if (nodeData) {
-            draggingNode = nodeData;
-            dragLayerY = draggingNode.position.y;
-            const mouseWorld = getMouseWorldPositionAtY(mouse, camera, dragLayerY);
-            dragOffset.copy(draggingNode.position).sub(mouseWorld);
+            const nodeInstance = nodeData.nodeRef; // actual Node class instance
+            draggingNode = nodeInstance;
+            // Set global drag flags - animation loop will handle position updates
+            window.isDraggingNode = true;
+            window.draggedNode = nodeInstance; // store Node instance for direct === comparison
+            window.dragLayerY = nodeData.position.y; // nodeData.position IS node.position
+            dragLayerY = nodeData.position.y; // Keep local for backward compatibility
+            const mouseWorld = getMouseWorldPositionAtY(mouse, camera, window.dragLayerY);
+            dragOffset.copy(nodeData.position).sub(mouseWorld);
+            window.dragOffset.copy(nodeData.position).sub(mouseWorld);
+            window.currentMouseX = event.clientX;
+            window.currentMouseY = event.clientY;
             event.stopPropagation();
         }
     }
 });
 
-renderer.domElement.addEventListener('mouseup', () => {
+renderer.domElement.addEventListener('mouseup', (event) => {
+    if (event.button === 2) {
+        rightMouseDown = false;
+        return;
+    }
     mouseDown = false;
     draggingNode = null;
+    // Clear global drag flags
+    window.isDraggingNode = false;
+    window.draggedNode = null;
 });
 
 renderer.domElement.addEventListener('mousemove', (event) => {
+    // Update current mouse position for animation loop
+    window.currentMouseX = event.clientX;
+    window.currentMouseY = event.clientY;
+
+    // Track whether this is a real drag (beyond threshold)
+    if (mouseDown || rightMouseDown) {
+        const dx = event.clientX - mouseDownX;
+        const dy = event.clientY - mouseDownY;
+        if (Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) hasDragged = true;
+    }
+
     if (mouseDown && draggingNode) {
-        const mouseWorld = getMouseWorldPositionAtY(mouse, camera, dragLayerY);
-        draggingNode.position.copy(mouseWorld.add(dragOffset));
-        // Fire custom event to resume physics
+        // Dragging logic moved to animation loop - just update camera controls here
         window.dispatchEvent(new Event('visualizer-node-drag'));
+    } else if (rightMouseDown) {
+        // Right-click pan: translate cameraConfig.center along camera right/up
+        const deltaX = event.clientX - mouseX;
+        const deltaY = event.clientY - mouseY;
+        const panSpeed = cameraRadius * 0.0015;
+
+        const right = new THREE.Vector3();
+        const up = new THREE.Vector3();
+        const lookDir = new THREE.Vector3();
+        camera.getWorldDirection(lookDir);
+        right.crossVectors(lookDir, camera.up).normalize();
+        up.crossVectors(right, lookDir).normalize();
+
+        cameraConfig.center.addScaledVector(right, -deltaX * panSpeed);
+        cameraConfig.center.addScaledVector(up, deltaY * panSpeed);
+        updateCameraPosition();
+        mouseX = event.clientX;
+        mouseY = event.clientY;
     } else if (mouseDown) {
         const deltaX = event.clientX - mouseX;
         const deltaY = event.clientY - mouseY;
@@ -218,10 +296,16 @@ renderer.domElement.addEventListener('mousemove', (event) => {
 });
 
 renderer.domElement.addEventListener('click', (event) => {
+    // Ignore click if it was end of a drag (node drag or camera pan/orbit)
+    if (hasDragged) {
+        hasDragged = false;
+        return;
+    }
     if (hoveredNode) {
         selectedNode = hoveredNode;
+        window.selectedNode = selectedNode;
         // Camera follows node
-        cameraConfig.center = selectedNode.position; // or selectedNode.mesh.position
+        cameraConfig.center.copy(selectedNode.position);
         updateCameraPosition();
         // Highlight links
         visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
@@ -232,7 +316,7 @@ renderer.domElement.addEventListener('click', (event) => {
 });
 
 renderer.domElement.addEventListener('wheel', (event) => {
-    cameraRadius = Math.max(5, Math.min(70, cameraRadius + event.deltaY * 0.05));
+    cameraRadius = Math.max(1, cameraRadius + event.deltaY * 0.05);
     updateCameraPosition();
     event.preventDefault();
 });
@@ -257,16 +341,25 @@ renderer.domElement.addEventListener('touchstart', (event) => {
         const pos = getTouchPos(touch);
         mouseX = pos.clientX;
         mouseY = pos.clientY;
+        window.currentMouseX = pos.clientX;
+        window.currentMouseY = pos.clientY;
         mouse.x = pos.x;
         mouse.y = pos.y;
         raycaster.setFromCamera(mouse, camera);
 
         const intersects = raycaster.intersectObjects(visualizer.getNodeMeshes());
         if (intersects.length > 0) {
-            draggingNode = intersects[0].object.userData.nodeData;
-            dragLayerY = draggingNode.position.y;
-            const mouseWorld = getMouseWorldPositionAtY(mouse, camera, dragLayerY);
-            dragOffset.copy(draggingNode.position).sub(mouseWorld);
+            const touchNodeData = intersects[0].object.userData.nodeData;
+            const nodeInstance = touchNodeData.nodeRef; // actual Node class instance
+            draggingNode = nodeInstance;
+            // Set global drag flags - animation loop will handle position updates
+            window.isDraggingNode = true;
+            window.draggedNode = nodeInstance; // store Node instance for direct === comparison
+            window.dragLayerY = touchNodeData.position.y; // nodeData.position IS node.position
+            dragLayerY = touchNodeData.position.y; // Keep local for backward compatibility
+            const mouseWorld = getMouseWorldPositionAtY(mouse, camera, window.dragLayerY);
+            dragOffset.copy(touchNodeData.position).sub(mouseWorld);
+            window.dragOffset.copy(touchNodeData.position).sub(mouseWorld);
             event.preventDefault();
         }
     }
@@ -284,10 +377,12 @@ renderer.domElement.addEventListener('touchmove', (event) => {
     if (event.touches.length === 1 && mouseDown) {
         const touch = event.touches[0];
         const pos = getTouchPos(touch);
+        // Update current mouse position for animation loop
+        window.currentMouseX = pos.clientX;
+        window.currentMouseY = pos.clientY;
+
         if (draggingNode) {
-            const mouseWorld = getMouseWorldPositionAtY(pos, camera, dragLayerY);
-            draggingNode.position.copy(mouseWorld.add(dragOffset));
-            // Fire custom event to resume physics
+            // Dragging logic moved to animation loop - just dispatch event
             window.dispatchEvent(new Event('visualizer-node-drag'));
         } else {
             const deltaX = pos.clientX - mouseX;
@@ -323,7 +418,7 @@ renderer.domElement.addEventListener('touchmove', (event) => {
         const dy = event.touches[0].clientY - event.touches[1].clientY;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const delta = dist - renderer._touchZoomDistance;
-        cameraRadius = Math.max(5, Math.min(70, renderer._touchZoomRadius - delta * 0.05));
+        cameraRadius = Math.max(1, renderer._touchZoomRadius - delta * 0.05);
         updateCameraPosition();
         event.preventDefault();
     }
@@ -333,6 +428,9 @@ renderer.domElement.addEventListener('touchend', (event) => {
     if (event.touches.length === 0) {
         mouseDown = false;
         draggingNode = null;
+        // Clear global drag flags
+        window.isDraggingNode = false;
+        window.draggedNode = null;
         renderer._touchZoomDistance = null;
     }
 }, { passive: false });
@@ -340,6 +438,9 @@ renderer.domElement.addEventListener('touchend', (event) => {
 renderer.domElement.addEventListener('touchcancel', () => {
     mouseDown = false;
     draggingNode = null;
+    // Clear global drag flags
+    window.isDraggingNode = false;
+    window.draggedNode = null;
     renderer._touchZoomDistance = null;
 }, { passive: false });
 
@@ -355,7 +456,8 @@ renderer.domElement.addEventListener('touchstart', (event) => {
         if (intersects.length > 0) {
             hoveredNode = intersects[0].object.userData.nodeData;
             selectedNode = hoveredNode;
-            cameraConfig.center = selectedNode.position;
+            window.selectedNode = selectedNode;
+            cameraConfig.center.copy(selectedNode.position);
             updateCameraPosition();
             visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
             displayNodeData(selectedNode);
@@ -432,8 +534,8 @@ toggleNamesBtn.addEventListener('click', () => {
     visualizer.toggleNodeLabels(visualizer.showNodeLabels);
 });
 
-// --- Name size slider ---
-nameSizeSlider.addEventListener('input', () => {
+// --- Name size slider --- only apply on release to avoid per-frame texture regen
+nameSizeSlider.addEventListener('change', () => {
     const size = parseFloat(nameSizeSlider.value);
     visualizer.setLabelSize(size);
 });
@@ -492,7 +594,8 @@ function selectNodeFromSearch(member) {
     const mesh = nodeMeshes.find(m => m.userData.nodeData && m.userData.nodeData.name === member.name);
     if (mesh) {
         selectedNode = mesh.userData.nodeData;
-        cameraConfig.center = selectedNode.position;
+        window.selectedNode = selectedNode;
+        cameraConfig.center.copy(selectedNode.position);
         updateCameraPosition();
         visualizer.highlightLinksForNode(selectedNode, visualizerConfig.linkHighlightColor);
         displayNodeData(selectedNode);
@@ -530,13 +633,48 @@ async function init() {
         if (data && data.members) {
             const { layers } = await visualizer.renderTree(data.members);
             const center = visualizer.getTreeLayoutCenter(layers);
-            cameraConfig.center = center;
+            cameraConfig.center.set(center.x, center.y, center.z);
             updateCameraPosition();
             // Slide in the side menu with a CSS transition
             const sideMenuEl = document.getElementById('side-menu');
             requestAnimationFrame(() => sideMenuEl.classList.remove('side-menu-hidden'));
             resizeRenderer();
             setupSidebarSearch(data.members);
+
+            // 5-second spawn camera: track centroid of placed nodes and zoom to fit
+            const spawnDuration = 5000;
+            const spawnStart = performance.now();
+            function spawnCameraFrame() {
+                const elapsed = performance.now() - spawnStart;
+                if (elapsed >= spawnDuration) return;
+
+                const placed = visualizer.nodes.filter(n => n.isPlaced);
+                if (placed.length > 1) {
+                    // Compute centroid
+                    let cx = 0, cy = 0, cz = 0;
+                    placed.forEach(n => { cx += n.position.x; cy += n.position.y; cz += n.position.z; });
+                    cx /= placed.length; cy /= placed.length; cz /= placed.length;
+
+                    // Compute bounding radius from centroid
+                    let maxDist = 0;
+                    placed.forEach(n => {
+                        const dx = n.position.x - cx;
+                        const dy = n.position.y - cy;
+                        const dz = n.position.z - cz;
+                        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        if (d > maxDist) maxDist = d;
+                    });
+
+                    // Smooth camera toward centroid
+                    cameraConfig.center.lerp(new THREE.Vector3(cx, cy, cz), 0.04);
+                    // Smooth radius to fit all nodes (with padding)
+                    const targetRadius = Math.max(cameraConfig.radius, maxDist * 2.0);
+                    cameraRadius += (targetRadius - cameraRadius) * 0.04;
+                    updateCameraPosition();
+                }
+                requestAnimationFrame(spawnCameraFrame);
+            }
+            requestAnimationFrame(spawnCameraFrame);
         }
     } catch (error) {
         console.error('Failed to initialize visualizer:', error);
